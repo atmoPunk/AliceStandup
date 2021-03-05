@@ -1,5 +1,6 @@
 from collections import namedtuple
 from storage import storage
+import logging
 
 Person = namedtuple('Person', ['first_name', 'last_name'])
 
