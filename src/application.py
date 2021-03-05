@@ -8,6 +8,7 @@ from dialog import handle_dialog
 application = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
+
 @application.route('/', methods=['POST'])
 def webhook():
     logging.info('Request: %r', request.json)

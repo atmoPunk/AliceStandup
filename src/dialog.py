@@ -1,8 +1,19 @@
+import logging
 from collections import namedtuple
 from storage import storage
-import logging
+
 
 Person = namedtuple('Person', ['first_name', 'last_name'])
+
+
+def new_user(user_id, resp):
+    resp['response']['text'] = 'Привет. Я могу помочь провести стендап, но для начала мне нужно узнать,' \
+                               'участников команды. Для этого можно сказать "Добавь в команду ИМЯ".' \
+                               'После того, как все люди будут добавлены - можно будет начинать стендап,' \
+                               'командой "Начни стендап".'
+    storage[user_id] = {}
+    storage[user_id].setdefault('users', [])
+    storage[user_id]['current_speaker'] = -1
 
 
 def start_standup(user_id, resp):
@@ -47,13 +58,7 @@ def handle_dialog(req, resp):
 
     user_id = req['session']['user']['user_id']
     if user_id not in storage:  # Новый пользователь
-        resp['response']['text'] = 'Привет. Я могу помочь провести стендап, но для начала мне нужно узнать,' \
-                                   'участников команды. Для этого можно сказать "Добавь в команду ИМЯ".' \
-                                   'После того, как все люди будут добавлены - можно будет начинать стендап,' \
-                                   'командой "Начни стендап".'
-        storage[user_id] = {}
-        storage[user_id].setdefault('users', [])
-        storage[user_id]['current_speaker'] = -1
+        new_user(user_id, resp)
         return
 
     if req['session']['new']:
@@ -69,9 +74,9 @@ def handle_dialog(req, resp):
 
     if req['request']['nlu']['intents'].get('team.newmember', None):  # Добавление человека в команду
         add_team_member(req, resp)
-    elif req['request']['command'] == 'начни стендап':
+    elif req['request']['command'] == 'начни стендап':  # TODO: don't recognize this if a standup is already happening
         start_standup(user_id, resp)
-    elif req['request']['command'] == 'у меня всё':
+    elif req['request']['command'] == 'у меня всё':  # TODO: don't recognize this if no standup is running
         call_next(user_id, resp)
     else:
         if storage[user_id]['current_speaker'] == -1:
