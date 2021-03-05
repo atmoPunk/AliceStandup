@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from collections import namedtuple
 
-Person = namedtuple('Person', ['first_name', 'second_name'])
+Person = namedtuple('Person', ['first_name', 'last_name'])
 
 load_dotenv()
 application = Flask(__name__)
