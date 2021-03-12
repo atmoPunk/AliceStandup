@@ -2,6 +2,8 @@ import inspect
 
 
 class Singleton(type):
+    objs = {}
+
     def __call__(cls, *args, **kwargs):
         signature = inspect.signature(super().__call__)
         ctor = signature.bind(*args, **kwargs)

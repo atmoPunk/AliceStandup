@@ -1,7 +1,7 @@
 import logging
 from collections import namedtuple
 
-from src import storage
+import storage
 
 Person = namedtuple('Person', ['first_name', 'last_name'])
 session_storage = {}
@@ -31,6 +31,7 @@ def call_next(connection, user_id, resp):
     except IndexError:
         resp['text'] = 'Это был последний участник команды. Завершаю сессию'
         resp['end_session'] = True
+        storage.reset_user(connection, user_id)
 
 
 def add_team_member(connection, req, resp):
@@ -75,7 +76,7 @@ def handle_dialog(req):
 
         if storage.check_standup(connection, user_id):
             if req['request']['command'] == 'у меня все':
-                call_next(user_id, resp)
+                call_next(connection, user_id, resp)
             else:
                 resp['text'] = ' '  # Игнорируем, если кто-то что-то говорит во время стендапа
         else:
