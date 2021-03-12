@@ -13,11 +13,10 @@ logging.basicConfig(level=logging.DEBUG)
 def webhook():
     logging.info('Request: %r', request.json)
 
-    response = handle_dialog(request.json)
-    response['version'] = request.json['version']
-    response['session'] = request.json['session']
-    if 'end_session' not in response['response']:
-        response['response']['end_session'] = False
+    response_contents = handle_dialog(request.json)
+    response = {'version': request.json['version'],
+                'session': request.json['session'],
+                'response': response_contents}
 
     logging.info('Response: %r', response)
     return jsonify(response)
