@@ -1,0 +1,10 @@
+root:
+    добавь в команду $Name
+
+$Name:
+    $YANDEX.FIO
+
+slots:
+    name:
+        source: $Name
+        type: YANDEX.FIO
