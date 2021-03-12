@@ -63,7 +63,7 @@ class DialogHandler:
         user_id = req['session']['user']['user_id']
         with storage.create_conn() as connection:
             self.connection = connection
-            if not self.connection.user_exits(user_id):  # Новый пользователь
+            if not self.connection.check_user_exists(user_id):  # Новый пользователь
                 self.new_user(user_id)
                 return
 
@@ -71,7 +71,7 @@ class DialogHandler:
                 self.returning_greeting(user_id)
                 return
 
-            if self.connection.check_standup(connection, user_id):  # user_id в текущий момент проводит стендап
+            if self.connection.check_standup(user_id):  # user_id в текущий момент проводит стендап
                 if req['request']['command'] == 'у меня все' or req['request']['command'] == 'у меня всё':
                     self.call_next(user_id)
                 else:
