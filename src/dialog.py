@@ -1,5 +1,5 @@
 import logging
-import typing
+from typing import Dict, Any
 import storage
 
 
@@ -38,7 +38,7 @@ class DialogHandler:
             self.response['end_session'] = True
             self.connection.reset_user(user_id)
 
-    def add_team_member(self, user_id: str, names: dict[str, str]):
+    def add_team_member(self, user_id: str, names: Dict[str, str]):
         first_name = names.get('first_name', '')
         last_name = names.get('last_name', '')
         if not first_name:
@@ -53,7 +53,7 @@ class DialogHandler:
         self.connection.start_standup(user_id)
         self.call_next(user_id)
 
-    def handle_dialog(self, req: dict[str, typing.Any]):
+    def handle_dialog(self, req: Dict[str, Any]):
         if 'user' not in req['session']:  # Не умеем работать с неавторизованными пользователями
             self.response['text'] = 'Привет. К сожалению, я не могу работать с неавторизованными пользователями.' \
                            'Пожалуйста, зайдите в свой аккаунт и попробуйте снова'

@@ -1,4 +1,5 @@
 import os
+from typing import Dict, List
 import psycopg2
 import psycopg2.extensions
 
@@ -30,7 +31,7 @@ class StorageConnection(psycopg2.extensions.connection):
         result = cur.fetchone()
         return result is not None
 
-    def add_team_member(self, user_id: str, person: dict[str, str]):
+    def add_team_member(self, user_id: str, person: Dict[str, str]):
         cur = self.cursor()
         if 'last_name' in person:
             cur.execute("""INSERT INTO persons(first_name, last_name) VALUES (%s, %s) RETURNING person_id""",
@@ -42,7 +43,7 @@ class StorageConnection(psycopg2.extensions.connection):
         person_id = cur.fetchone()[0]
         cur.execute("""INSERT INTO teams(user_id, person_id) VALUES (%s, %s)""", (user_id, person_id))
 
-    def get_team(self, user_id: str) -> list[dict[str, str]]:
+    def get_team(self, user_id: str) -> List[Dict[str, str]]:
         cur = self.cursor()
         cur.execute(
             """SELECT first_name, last_name FROM persons JOIN teams on teams.person_id = persons.person_id WHERE user_id=%s""",
@@ -53,7 +54,7 @@ class StorageConnection(psycopg2.extensions.connection):
             result.append({'first_name': person[0], 'last_name': person[1]})
         return result
 
-    def get_team_member(self, user_id: str, member_idx: int) -> dict[str, str]:
+    def get_team_member(self, user_id: str, member_idx: int) -> Dict[str, str]:
         cur = self.cursor()
         cur.execute(
             """SELECT first_name, last_name FROM persons JOIN teams on teams.person_id = persons.person_id WHERE user_id=%s""",
@@ -61,7 +62,7 @@ class StorageConnection(psycopg2.extensions.connection):
         persons = cur.fetchall()
         return {'first_name': persons[member_idx][0], 'last_name': persons[member_idx][0]}
 
-    def call_next_speaker(self, user_id: str) -> dict[str, str]:
+    def call_next_speaker(self, user_id: str) -> Dict[str, str]:
         cur = self.cursor()
         cur.execute("""SELECT cur_speaker FROM users where user_id = %s""", (user_id,))
         speaker_num = cur.fetchone()[0]
