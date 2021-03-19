@@ -61,6 +61,7 @@ class DialogHandler:
             return
 
         user_id = req['session']['user']['user_id']
+        # Этот context manager закоммитит транзакцию, но не закроет соединение
         with storage.create_conn() as connection:
             self.connection = connection
             if not self.connection.check_user_exists(user_id):  # Новый пользователь
