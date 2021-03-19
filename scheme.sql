@@ -1,17 +1,17 @@
-persons(
-	person_id: integer, primary key
-	first_name: text, not null
-	last_name: text
-)
+CREATE TABLE PERSONS(
+	person_id SERIAL PRIMARY KEY,
+	first_name TEXT NOT NULL,
+	last_name TEXT NOT NULL
+);
 
-users(
-	user_id: text, primary key
-	standup_held: boolean, not null
-	cur_speaker: integer, not null
-)
+CREATE TABLE USERS(
+	user_id TEXT PRIMARY KEY,
+	standup_held BOOLEAN NOT NULL,
+	cur_speaker INTEGER NOT NULL
+);
 
-teams(
-	team_mapping_id: integer, primary key
-	user_id: text, foreign key (users.user_id)
-	person_id: integer, foreign key (persons.person_id)
-)
+CREATE TABLE TEAMS(
+	team_id SERIAL PRIMARY KEY,
+	user_id TEXT REFERENCES USERS(user_id),
+	person_id INTEGER REFERENCES PERSONS(person_id)
+);
