@@ -7,6 +7,6 @@ CREATE TABLE USERS( -- пользователи навыка
 CREATE TABLE PERSONS( -- участники команд
 	person_id SERIAL PRIMARY KEY,
 	first_name TEXT NOT NULL,
-	last_name TEXT NOT NULL,
-	standup_organizer INTEGER REFERENCES USERS(user_id)
+	last_name TEXT,
+	standup_organizer TEXT REFERENCES USERS(user_id)
 );

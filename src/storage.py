@@ -48,7 +48,7 @@ class StorageConnection(psycopg2.extensions.connection):
         persons = cur.fetchall()
         result = []
         for person in persons:
-            result.append({'first_name': person[0], 'last_name': person[1]})
+            result.append({'first_name': person[0], 'last_name': person[1] or ''})
         return result
 
     def get_team_member(self, user_id: str, member_idx: int) -> Dict[str, str]:
@@ -57,7 +57,7 @@ class StorageConnection(psycopg2.extensions.connection):
             """SELECT first_name, last_name FROM persons WHERE standup_organizer=%s ORDER BY person_id ASC""",
             (user_id,))
         persons = cur.fetchall()
-        return {'first_name': persons[member_idx][0], 'last_name': persons[member_idx][1]}
+        return {'first_name': persons[member_idx][0], 'last_name': persons[member_idx][1] or ''}
 
     def call_next_speaker(self, user_id: str) -> Dict[str, str]:
         cur = self.cursor()
