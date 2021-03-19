@@ -3,6 +3,7 @@ from typing import Dict, List
 import psycopg2
 import psycopg2.extensions
 import psycopg2.pool
+import functools
 
 
 class StorageConnection(psycopg2.extensions.connection):
@@ -65,20 +66,23 @@ class StorageConnection(psycopg2.extensions.connection):
         with self.cursor() as cur:
             cur.execute("""SELECT cur_speaker FROM users where user_id = %s""", (user_id,))
             speaker_num = cur.fetchone()[0]
-            next_speaker = self.get_team_member(user_id, speaker_num)  # This throws IndexError so we can end the standup
+            # This throws IndexError so we can end the standup
+            next_speaker = self.get_team_member(user_id, speaker_num)
         with self.cursor() as cur:
             cur.execute("""UPDATE users SET cur_speaker = cur_speaker + 1 WHERE user_id = %s""", (user_id,))
         return next_speaker
 
 
-pool = psycopg2.pool.ThreadedConnectionPool(minconn=1,
-                                            maxconn=2,
-                                            host=os.getenv('PG_HOST'),
-                                            user=os.getenv('PG_USER'),
-                                            database=os.getenv('PG_DB'),
-                                            password=os.getenv('PG_PWD'),
-                                            connection_factory=StorageConnection)
+@functools.cache
+def pool():
+    return psycopg2.pool.ThreadedConnectionPool(minconn=1,
+                                                maxconn=2,
+                                                host=os.getenv('PG_HOST'),
+                                                user=os.getenv('PG_USER'),
+                                                database=os.getenv('PG_DB'),
+                                                password=os.getenv('PG_PWD'),
+                                                connection_factory=StorageConnection)
 
 
 def create_conn() -> StorageConnection:
-    return pool.getconn()
+    return pool().getconn()
