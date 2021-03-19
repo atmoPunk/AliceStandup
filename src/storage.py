@@ -67,13 +67,18 @@ class StorageConnection(psycopg2.extensions.connection):
             cur.execute("""SELECT cur_speaker FROM users where user_id = %s""", (user_id,))
             speaker_num = cur.fetchone()[0]
             # This throws IndexError so we can end the standup
-            next_speaker = self.get_team_member(user_id, speaker_num)
+        next_speaker = self.get_team_member(user_id, speaker_num)
         with self.cursor() as cur:
             cur.execute("""UPDATE users SET cur_speaker = cur_speaker + 1 WHERE user_id = %s""", (user_id,))
         return next_speaker
 
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        res = super(StorageConnection, self).__exit__(exc_type, exc_val, exc_tb)
+        pool().putconn(self)
+        return res
 
-@functools.cache
+
+@functools.lru_cache
 def pool():
     return psycopg2.pool.ThreadedConnectionPool(minconn=1,
                                                 maxconn=2,
