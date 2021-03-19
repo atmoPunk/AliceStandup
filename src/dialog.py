@@ -77,6 +77,7 @@ class DialogHandler:
                     self.call_next(user_id)
                 else:
                     self.response['text'] = ' '  # Игнорируем не команды
+                    self.response['tts'] = '<speaker audio="dialogs-upload/a9c17655-16e5-4fb6-b5a7-9613abc563f6/89c78762-ddb6-4b42-8b28-fb4065f18d0f.opus">'
                 return
 
             if 'team.newmember' in req['request']['nlu']['intents']:  # Добавление человека в команду
