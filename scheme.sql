@@ -1,17 +1,12 @@
-CREATE TABLE PERSONS(
-	person_id SERIAL PRIMARY KEY,
-	first_name TEXT NOT NULL,
-	last_name TEXT NOT NULL
-);
-
-CREATE TABLE USERS(
-	user_id TEXT PRIMARY KEY,
+CREATE TABLE USERS( -- пользователи навыка
+	user_id TEXT PRIMARY KEY, -- user_id из навыка
 	standup_held BOOLEAN NOT NULL,
 	cur_speaker INTEGER NOT NULL
 );
 
-CREATE TABLE TEAMS(
-	team_id SERIAL PRIMARY KEY,
-	user_id TEXT REFERENCES USERS(user_id),
-	person_id INTEGER REFERENCES PERSONS(person_id)
+CREATE TABLE PERSONS( -- участники команд
+	person_id SERIAL PRIMARY KEY,
+	first_name TEXT NOT NULL,
+	last_name TEXT NOT NULL,
+	standup_organizer INTEGER REFERENCES USERS(user_id)
 );

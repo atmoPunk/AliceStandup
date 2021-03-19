@@ -34,19 +34,16 @@ class StorageConnection(psycopg2.extensions.connection):
     def add_team_member(self, user_id: str, person: Dict[str, str]):
         cur = self.cursor()
         if 'last_name' in person:
-            cur.execute("""INSERT INTO persons(first_name, last_name) VALUES (%s, %s) RETURNING person_id""",
-                        (person['first_name'],
-                         person['last_name']))
+            cur.execute("""INSERT INTO persons(first_name, last_name, standup_organizer) VALUES (%s, %s, %s)""",
+                        (person['first_name'], person['last_name'], user_id))
         else:
-            cur.execute("""INSERT INTO persons(first_name, last_name) VALUES (%s) RETURNING member_id""",
-                        (person['first_name'],))
-        person_id = cur.fetchone()[0]
-        cur.execute("""INSERT INTO teams(user_id, person_id) VALUES (%s, %s)""", (user_id, person_id))
+            cur.execute("""INSERT INTO persons(first_name, standup_organizer) VALUES (%s, %s)""",
+                        (person['first_name'], user_id))
 
     def get_team(self, user_id: str) -> List[Dict[str, str]]:
         cur = self.cursor()
         cur.execute(
-            """SELECT first_name, last_name FROM persons JOIN teams on teams.person_id = persons.person_id WHERE user_id=%s""",
+            """SELECT first_name, last_name FROM persons WHERE standup_organizer=%s""",  # Здесь порядок не очень важен
             (user_id,))
         persons = cur.fetchall()
         result = []
@@ -57,10 +54,10 @@ class StorageConnection(psycopg2.extensions.connection):
     def get_team_member(self, user_id: str, member_idx: int) -> Dict[str, str]:
         cur = self.cursor()
         cur.execute(
-            """SELECT first_name, last_name FROM persons JOIN teams on teams.person_id = persons.person_id WHERE user_id=%s""",
+            """SELECT first_name, last_name FROM persons WHERE standup_organizer=%s ORDER BY person_id ASC""",
             (user_id,))
         persons = cur.fetchall()
-        return {'first_name': persons[member_idx][0], 'last_name': persons[member_idx][0]}
+        return {'first_name': persons[member_idx][0], 'last_name': persons[member_idx][1]}
 
     def call_next_speaker(self, user_id: str) -> Dict[str, str]:
         cur = self.cursor()
