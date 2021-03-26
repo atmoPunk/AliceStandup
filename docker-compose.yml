@@ -7,10 +7,11 @@ services:
     environment:
       - PG_PWD
       - PG_USER
-      - PG_HOST=localhost
+      - PG_HOST=postgres
       - PG_DB=${PG_USER}
       - SSL_CERT
       - SSL_KEY
+      - PYTHONUNBUFFERED=1
     volumes:
       - ${SSL_CERT}:${SSL_CERT}
       - ${SSL_KEY}:${SSL_KEY}
