@@ -54,7 +54,7 @@ class DialogHandler:
                 self.response['tts'] = f'{speaker["first_name"]} , расскажи о прошедшем дне'
             else:
                 self.response['tts'] += f'{speaker["first_name"]} , расскажи о прошедшем дне'
-            self.response['tts'] += f' {self.tts()} {self.tts_end}'
+            self.response['tts'] += f' {self.tts() or ""} {self.tts_end}'
         except IndexError:
             self.response['text'] = 'Это был последний участник команды. Завершаю сессию'
             self.response['tts'] = 'это был последний учасник команды . завершаю сессию'
@@ -63,9 +63,9 @@ class DialogHandler:
 
     def add_team_member(self, user_id: str, names: Dict[str, str]):
         first_name = names.get('first_name', '')
-        last_name = names.get('last_name', None) or ''
+        last_name = names.get('last_name', '')
         if not first_name:
-            self.response['text'] = 'К сожалению я не смогла распонзнать имя, попробуйте ещё раз'
+            self.response['text'] = 'К сожалению я не смогла распознать имя, попробуйте ещё раз'
             return
         self.connection.add_team_member(user_id, names)
         logging.info('Added Person(%r,%r) to %r\'s storage', first_name, last_name, user_id)
@@ -75,7 +75,7 @@ class DialogHandler:
         first_name = names.get('first_name', '')
         last_name = names.get('last_name', '')
         if not first_name:
-            self.response['text'] = 'К сожалению я не смогла распонзнать имя, попробуйте ещё раз'
+            self.response['text'] = 'К сожалению я не смогла распознать имя, попробуйте ещё раз'
             return
         if self.connection.del_team_member(user_id, names):
             # TODO: удалить мы можем только по имени, поэтому здесь могут быть проблемы с людьми в одной команде,
@@ -118,7 +118,7 @@ class DialogHandler:
                     self.response['text'] = 'Стендап завершен'
                 else:  # Тут человек по идее говорит "продолжить", но мы съедаем все слова
                     self.response['text'] = ' '  # Игнорируем не команды
-                    self.response['tts'] = f'{self.tts()} + {self.tts_end}'
+                    self.response['tts'] = f'{self.tts() or ""} + {self.tts_end}'
                 return
 
             if req['request']['command'] == 'помощь':
