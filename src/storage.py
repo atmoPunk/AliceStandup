@@ -79,7 +79,7 @@ class StorageConnection(psycopg2.extensions.connection):
 
 
 @functools.lru_cache
-def pool():
+def pool() -> psycopg2.pool.ThreadedConnectionPool:
     return psycopg2.pool.ThreadedConnectionPool(minconn=1,
                                                 maxconn=2,
                                                 host=os.getenv('PG_HOST'),
@@ -89,5 +89,7 @@ def pool():
                                                 connection_factory=StorageConnection)
 
 
-def create_conn() -> StorageConnection:
-    return pool().getconn()
+class StorageConnectionFactory:
+    @staticmethod
+    def create_conn() -> StorageConnection:
+        return pool().getconn()
