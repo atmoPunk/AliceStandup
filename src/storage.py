@@ -48,7 +48,7 @@ class StorageConnection(psycopg2.extensions.connection):
                 cur.execute("""DELETE FROM persons WHERE (first_name=%s AND last_name=%s AND standup_organizer=%s) RETURNING *""",
                             (person['first_name'], person['last_name'], user_id))
             else:
-                cur.execute("""DELETE FROM persons WHERE (first_name=%s AND last_name IS NULL standup_organizer=%s) RETURNING *""",
+                cur.execute("""DELETE FROM persons WHERE (first_name=%s AND last_name IS NULL AND standup_organizer=%s) RETURNING *""",
                             (person['first_name'], user_id))
             return cur.fetchone() is not None
 
