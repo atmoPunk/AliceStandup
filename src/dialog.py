@@ -1,12 +1,10 @@
 import logging
 import re
+import os
 from typing import Dict, Any
 
 
 class DialogHandler:
-    # Звук тишины
-    tts = '<speaker audio="dialogs-upload/a9c17655-16e5-4fb6' \
-          '-b5a7-9613abc563f6/89c78762-ddb6-4b42-8b28-fb4065f18d0f.opus">'
     tts_end = 'если вы закончили , скажите " у меня всё " , иначе скажите " продолжить " '
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
     end_standup_re = re.compile('закончи(ть)? (стендап|стенд ап|standup|stand up)')
@@ -26,6 +24,10 @@ class DialogHandler:
             self.response['text'] += '\nВы остались в состоянии проведения стендапа в прошлый раз. ' \
                                      'Чтобы выйти из этого состояния, скажите "закончить стендап"'
 
+    @staticmethod
+    def tts() -> str:
+        # Звук тишины
+        return os.getenv('TTS_FILENAME')
 
     @staticmethod
     def help_message() -> str:
@@ -52,7 +54,7 @@ class DialogHandler:
                 self.response['tts'] = f'{speaker["first_name"]} , расскажи о прошедшем дне'
             else:
                 self.response['tts'] += f'{speaker["first_name"]} , расскажи о прошедшем дне'
-            self.response['tts'] += f' {self.tts} {self.tts_end}'
+            self.response['tts'] += f' {self.tts()} {self.tts_end}'
         except IndexError:
             self.response['text'] = 'Это был последний участник команды. Завершаю сессию'
             self.response['tts'] = 'это был последний учасник команды . завершаю сессию'
@@ -116,7 +118,7 @@ class DialogHandler:
                     self.response['text'] = 'Стендап завершен'
                 else:  # Тут человек по идее говорит "продолжить", но мы съедаем все слова
                     self.response['text'] = ' '  # Игнорируем не команды
-                    self.response['tts'] = f'{self.tts} + {self.tts_end}'
+                    self.response['tts'] = f'{self.tts()} + {self.tts_end}'
                 return
 
             if req['request']['command'] == 'помощь':
