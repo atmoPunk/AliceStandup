@@ -38,14 +38,16 @@ class DialogHandler:
             speaker = self.connection.call_next_speaker(user_id)
             if 'text' not in self.response:
                 self.response['text'] = f'{speaker["first_name"].capitalize()}, расскажи о прошедшем дне'
-                self.response['tts'] = f'{speaker["first_name"]} , расскажи о прошедшем дне'
             else:
                 self.response['text'] += f'{speaker["first_name"].capitalize()}, расскажи о прошедшем дне'
+            if 'tts' not in self.response:
+                self.response['tts'] = f'{speaker["first_name"]} , расскажи о прошедшем дне'
+            else:
                 self.response['tts'] += f'{speaker["first_name"]} , расскажи о прошедшем дне'
             self.response['tts'] += f' {self.tts} {self.tts_end}'
         except IndexError:
             self.response['text'] = 'Это был последний участник команды. Завершаю сессию'
-            self.response['tts'] = 'это был последний учасник команды . завершаю сесси1ю'
+            self.response['tts'] = 'это был последний учасник команды . завершаю сессию'
             self.response['end_session'] = True
             self.connection.reset_user(user_id)
 
