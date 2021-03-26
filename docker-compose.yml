@@ -1,0 +1,16 @@
+version: "0.1"
+services:
+  bot:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - PG_PWD
+      - PG_USER
+      - PG_HOST=localhost
+      - PG_DB="${PG_USER}"
+  postgres:
+    build: db/
+    environment:
+      - POSTGRES_PASSWORD="${PG_PWD}"
+      - POSTGRES_USER="${PG_USER}
