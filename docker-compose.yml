@@ -8,9 +8,14 @@ services:
       - PG_PWD
       - PG_USER
       - PG_HOST=localhost
-      - PG_DB="${PG_USER}"
+      - PG_DB=${PG_USER}
+      - SSL_CERT
+      - SSL_KEY
+    volumes:
+      - ${SSL_CERT}:${SSL_CERT}
+      - ${SSL_KEY}:${SSL_KEY}
   postgres:
     build: db/
     environment:
-      - POSTGRES_PASSWORD="${PG_PWD}"
-      - POSTGRES_USER="${PG_USER}
+      - POSTGRES_PASSWORD=${PG_PWD}
+      - POSTGRES_USER=${PG_USER}
