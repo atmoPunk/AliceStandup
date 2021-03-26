@@ -8,7 +8,8 @@ class DialogHandler:
     tts = '<speaker audio="dialogs-upload/a9c17655-16e5-4fb6' \
           '-b5a7-9613abc563f6/89c78762-ddb6-4b42-8b28-fb4065f18d0f.opus">'
     tts_end = 'если вы закончили , скажите " у меня всё " , иначе скажите " продолжить " '
-    begin_standup_re = re.compile('^(начни|проведи) (стендап|стенд ап|standup|stand up)')
+    begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
+    end_standup_re = re.compile('закончи(ть)? (стендап|стенд ап|standup|stand up)')
 
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
@@ -21,13 +22,21 @@ class DialogHandler:
         names = [f'{person["last_name"].capitalize()} {person["first_name"].capitalize()}' for person in team]
         team_names = ', '.join(names)
         self.response['text'] = greeting + team_names + '.'
+        if self.connection.check_standup(user_id):
+            self.response['text'] += '\nВы остались в состоянии проведения стендапа в прошлый раз.' \
+                                     'Чтобы выйти из этого состояния, скажите "закончить стендап"'
+
 
     @staticmethod
     def help_message() -> str:
         return 'Привет. Я могу помочь провести стендап, но для начала мне нужно узнать' \
                'участников команды. Для этого можно сказать "Добавь в команду ИМЯ".' \
                'После того, как все люди будут добавлены - можно будет начинать стендап' \
-               'командой "Начни стендап".'
+               'командами "Начни стендап" или "Проведи стендап". Алиса будет вызывать участников' \
+               'и даст им одну минуту на рассказ, во время которой навык не будет воспринимать команды' \
+               '(при помощи аудиозаписи без звука). По истечении этой минуты (или раннего завершения) можно' \
+               'сказать "у меня всё", и тогда Алиса вызовет следующего участника, или сказать продолжить для' \
+               'ещё одной минуты.'
 
     def new_user(self, user_id: str):
         self.connection.create_user(user_id)
@@ -89,9 +98,16 @@ class DialogHandler:
             if self.connection.check_standup(user_id):  # user_id в текущий момент проводит стендап
                 if req['request']['command'] == 'у меня все' or req['request']['command'] == 'у меня всё':
                     self.call_next(user_id)
+                elif self.end_standup_re.match(req['request']['command']):
+                    self.connection.reset_user(user_id)
+                    self.response['text'] = 'Стендап завершен'
                 else:  # Тут человек по идее говорит "продолжить", но мы съедаем все слова
                     self.response['text'] = ' '  # Игнорируем не команды
                     self.response['tts'] = f'{self.tts} + {self.tts_end}'
+                return
+
+            if req['request']['command'] == 'помощь':
+                self.response['text'] = self.help_message()
                 return
 
             if 'team.newmember' in req['request']['nlu']['intents']:  # Добавление человека в команду
