@@ -12,6 +12,7 @@ services:
       - SSL_CERT
       - SSL_KEY
       - PYTHONUNBUFFERED=1
+      - TTS_FILENAME
     volumes:
       - ${SSL_CERT}:${SSL_CERT}
       - ${SSL_KEY}:${SSL_KEY}
