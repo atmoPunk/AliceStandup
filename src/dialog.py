@@ -69,6 +69,20 @@ class DialogHandler:
         logging.info('Added Person(%r,%r) to %r\'s storage', first_name, last_name, user_id)
         self.response['text'] = f'Запомнила человека {last_name.capitalize()} {first_name.capitalize()}'
 
+    def del_team_member(self, user_id: str, names: Dict[str, str]):
+        first_name = names.get('first_name', '')
+        last_name = names.get('last_name', '')
+        if not first_name:
+            self.response['text'] = 'К сожалению я не смогла распонзнать имя, попробуйте ещё раз'
+            return
+        if self.connection.del_team_member(user_id, names):
+            # TODO: удалить мы можем только по имени, поэтому здесь могут быть проблемы с людьми в одной команде,
+            # TODO: у которых совпадают имя и фамилия
+            logging.info('Deleted Person(%r,%r) from %r\'s storage', first_name, last_name, user_id)
+            self.response['text'] = f'Удалила {last_name.capitalize()} {first_name.capitalize()} из команды'
+        else:
+            self.response['text'] = f'Не смогла удалить {last_name.capitalize()} {first_name.capitalize()}'
+
     def start_standup(self, user_id: str):
         self.response['text'] = 'Хорошо, начинаю.\n'
         self.response['tts'] = 'хорошо , начинаю .'
@@ -113,6 +127,10 @@ class DialogHandler:
                 self.add_team_member(user_id,
                                      req['request']['nlu']['intents']['team.newmember']['slots']['name']['value'])
                 return
+
+            if 'team.delmember' in req['request']['nlu']['intents']:
+                self.del_team_member(user_id,
+                                     req['request']['nlu']['intents']['team.delmember']['slots']['name']['value'])
 
             if self.begin_standup_re.match(req['request']['command']):
                 self.start_standup(user_id)

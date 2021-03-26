@@ -42,6 +42,16 @@ class StorageConnection(psycopg2.extensions.connection):
                 cur.execute("""INSERT INTO persons(first_name, standup_organizer) VALUES (%s, %s)""",
                             (person['first_name'], user_id))
 
+    def del_team_member(self, user_id: str, person: Dict[str, str]):
+        with self.cursor() as cur:
+            if 'last_name' in person:
+                cur.execute("""DELETE FROM persons WHERE (first_name=%s AND last_name=%s AND standup_organizer=%s) RETURNING *""",
+                            (person['first_name'], person['last_name'], user_id))
+            else:
+                cur.execute("""DELETE FROM persons WHERE (first_name=%s AND last_name IS NULL standup_organizer=%s) RETURNING *""",
+                            (person['first_name'], user_id))
+            return cur.fetchone() is not None
+
     def get_team(self, user_id: str) -> List[Dict[str, str]]:
         with self.cursor() as cur:
             # Здесь порядок не очень важен, поэтому без ORDER BY
