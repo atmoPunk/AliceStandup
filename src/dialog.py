@@ -131,6 +131,7 @@ class DialogHandler:
             if 'team.delmember' in req['request']['nlu']['intents']:
                 self.del_team_member(user_id,
                                      req['request']['nlu']['intents']['team.delmember']['slots']['name']['value'])
+                return
 
             if self.begin_standup_re.match(req['request']['command']):
                 self.start_standup(user_id)
