@@ -56,8 +56,15 @@ class DialogHandler:
                 self.response['tts'] += f'{speaker["first_name"]} , расскажи о прошедшем дне'
             self.response['tts'] += f' {self.tts() or ""} {self.tts_end}'
         except IndexError:
-            self.response['text'] = 'Это был последний участник команды. Завершаю сессию'
-            self.response['tts'] = 'это был последний учасник команды . завершаю сессию'
+            self.response['text'] = 'Это был последний участник команды'
+            themes = self.connection.get_team_themes(user_id)
+            theme_list = []
+            for theme in themes:
+                if theme['theme']:
+                    theme_list.append(f'у {theme["first_name"].capitalize()} была тема "{theme["theme"]}"')
+            if theme_list:
+                self.response['text'] += '. Сегодня ' + ', '.join(theme_list)
+            self.response['text'] += '.\nЗавершаю сессию'
             self.response['end_session'] = True
             self.connection.reset_user(user_id)
 
@@ -91,6 +98,11 @@ class DialogHandler:
         self.connection.start_standup(user_id)
         self.call_next(user_id)
 
+    def add_theme(self, user_id: str, request: Dict[str, Any]):
+        theme = request['command'][13:]
+        self.connection.set_theme_for_current_speaker(user_id, theme)
+        self.response['text'] = f'Запомнила тему "{theme}"'
+
     def handle_dialog(self, req: Dict[str, Any]):
         if 'user' not in req['session']:  # Не умеем работать с неавторизованными пользователями
             self.response['text'] = 'Привет. К сожалению, я не могу работать с неавторизованными пользователями. ' \
@@ -113,6 +125,8 @@ class DialogHandler:
             if self.connection.check_standup(user_id):  # user_id в текущий момент проводит стендап
                 if req['request']['command'] == 'у меня все' or req['request']['command'] == 'у меня всё':
                     self.call_next(user_id)
+                elif req['request']['command'].startswith('запомни тему '):
+                    self.add_theme(user_id, req['request'])
                 elif self.end_standup_re.match(req['request']['command']):
                     self.connection.reset_user(user_id)
                     self.response['text'] = 'Стендап завершен'
