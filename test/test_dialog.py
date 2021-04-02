@@ -55,13 +55,13 @@ class TestDialogHandler:
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
         assert {'end_session': False, 'text': 'Запомнила человека  Вова'} == handler.response
-        assert {'first_name': 'вова'} in factory.storage.storage[user_id]['team']
+        assert {'first_name': 'вова', 'theme': None} in factory.storage.storage[user_id]['team']
         request = create_request(user_id, 'добавь в команду Иванова Диму')
         add_name_intent(request, 'дима', 'иванов')  # Заменяем парсинг интентов от Яндекса
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
         assert {'end_session': False, 'text': 'Запомнила человека Иванов Дима'} == handler.response
-        assert {'first_name': 'дима', 'last_name': 'иванов'} in factory.storage.storage[user_id]['team']
+        assert {'first_name': 'дима', 'last_name': 'иванов', 'theme': None} in factory.storage.storage[user_id]['team']
 
     def test_start_standup_empty(self):
         factory = MockStorageConnectionFactory()
@@ -70,8 +70,7 @@ class TestDialogHandler:
         request = create_request(user_id, 'начни стендап')
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
-        assert {'end_session': True, 'text': 'Это был последний участник команды. Завершаю сессию',
-                'tts': 'это был последний учасник команды . завершаю сессию'} == handler.response
+        assert {'end_session': True, 'text': 'Это был последний участник команды.\nЗавершаю сессию'} == handler.response
 
     def test_start_standup(self):
         factory = MockStorageConnectionFactory()
@@ -115,8 +114,7 @@ class TestDialogHandler:
         request = create_request(user_id, 'у меня все')
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
-        assert {'end_session': True, 'text': 'Это был последний участник команды. Завершаю сессию',
-                'tts': 'это был последний учасник команды . завершаю сессию'} == handler.response
+        assert {'end_session': True, 'text': 'Это был последний участник команды.\nЗавершаю сессию'} == handler.response
         assert 0 == factory.storage.storage[user_id]['cur_speaker']
         assert not factory.storage.storage[user_id]['standup_held']
 
@@ -137,3 +135,33 @@ class TestDialogHandler:
         handler.handle_dialog(request)
         assert {'first_name': 'вова'} not in factory.storage.storage[user_id]['team']
         assert {'end_session': False, 'text': 'Удалила  Вова из команды'} == handler.response
+
+    def test_themes(self):
+        factory = MockStorageConnectionFactory()
+        user_id = '1'
+        factory.storage.create_user(user_id)
+        factory.storage.add_team_member(user_id, {'first_name': 'вова'})
+        factory.storage.add_team_member(user_id, {'first_name': 'дима', 'last_name': 'иванов'})
+        factory.storage.storage[user_id]['standup_held'] = True
+        factory.storage.storage[user_id]['cur_speaker'] = 1
+        request = create_request(user_id, 'запомни тему чай')
+        handler = DialogHandler(factory)
+        handler.handle_dialog(request)
+        assert {'end_session': False, 'text': 'Запомнила тему "чай"'} == handler.response
+        assert factory.storage.storage[user_id]['team'][0]['theme'] == 'чай'
+        request = create_request(user_id, 'у меня всё')
+        handler = DialogHandler(factory)
+        handler.handle_dialog(request)
+        request = create_request(user_id, 'запомни тему кофе')
+        handler = DialogHandler(factory)
+        handler.handle_dialog(request)
+        assert factory.storage.storage[user_id]['team'][1]['theme'] == 'кофе'
+        assert {'end_session': False, 'text': 'Запомнила тему "кофе"'} == handler.response
+        request = create_request(user_id, 'у меня всё')
+        handler = DialogHandler(factory)
+        handler.handle_dialog(request)
+        # Reset themes
+        assert factory.storage.storage[user_id]['team'][0]['theme'] is None
+        assert factory.storage.storage[user_id]['team'][1]['theme'] is None
+        assert {'end_session': True, 'text': 'Это был последний участник команды. Сегодня у Вова была тема "чай", '
+                                             'у Дима была тема "кофе".\nЗавершаю сессию'} == handler.response

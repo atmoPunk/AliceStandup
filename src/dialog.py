@@ -70,6 +70,8 @@ class DialogHandler:
             self.response['text'] += '. Сегодня ' + ', '.join(theme_list)
         self.response['text'] += '.\nЗавершаю сессию'
         self.response['end_session'] = True
+        if 'tts' in self.response:
+            del self.response['tts']
         self.connection.reset_user(user_id)
 
     def add_team_member(self, user_id: str, names: Dict[str, str]):
