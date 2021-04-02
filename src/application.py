@@ -3,6 +3,7 @@ import logging
 import os
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
+from storage import StorageConnectionFactory
 from dialog import DialogHandler
 
 application = Flask(__name__)
@@ -12,7 +13,7 @@ logging.basicConfig(level=logging.DEBUG)
 @application.route('/', methods=['POST'])
 def webhook():
     logging.info('Request: %r', request.json)
-    handler = DialogHandler()
+    handler = DialogHandler(StorageConnectionFactory())
     handler.handle_dialog(request.json)
     response = {'version': request.json['version'],
                 'session': request.json['session'],

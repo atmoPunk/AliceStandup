@@ -1,0 +1,10 @@
+root:
+    удали из команды $Name
+
+$Name:
+    $YANDEX.FIO
+
+slots:
+    name:
+        source: $Name
+        type: YANDEX.FIO

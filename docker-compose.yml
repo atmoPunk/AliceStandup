@@ -1,0 +1,23 @@
+version: "3.8"
+services:
+  bot:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - PG_PWD
+      - PG_USER
+      - PG_HOST=postgres
+      - PG_DB=${PG_USER}
+      - SSL_CERT
+      - SSL_KEY
+      - PYTHONUNBUFFERED=1
+      - TTS_FILENAME
+    volumes:
+      - ${SSL_CERT}:${SSL_CERT}
+      - ${SSL_KEY}:${SSL_KEY}
+  postgres:
+    build: db/
+    environment:
+      - POSTGRES_PASSWORD=${PG_PWD}
+      - POSTGRES_USER=${PG_USER}

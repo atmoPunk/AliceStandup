@@ -42,6 +42,16 @@ class StorageConnection(psycopg2.extensions.connection):
                 cur.execute("""INSERT INTO persons(first_name, standup_organizer) VALUES (%s, %s)""",
                             (person['first_name'], user_id))
 
+    def del_team_member(self, user_id: str, person: Dict[str, str]):
+        with self.cursor() as cur:
+            if 'last_name' in person:
+                cur.execute("""DELETE FROM persons WHERE (first_name=%s AND last_name=%s AND standup_organizer=%s) RETURNING *""",
+                            (person['first_name'], person['last_name'], user_id))
+            else:
+                cur.execute("""DELETE FROM persons WHERE (first_name=%s AND last_name IS NULL AND standup_organizer=%s) RETURNING *""",
+                            (person['first_name'], user_id))
+            return cur.fetchone() is not None
+
     def get_team(self, user_id: str) -> List[Dict[str, str]]:
         with self.cursor() as cur:
             # Здесь порядок не очень важен, поэтому без ORDER BY
@@ -79,7 +89,7 @@ class StorageConnection(psycopg2.extensions.connection):
 
 
 @functools.lru_cache
-def pool():
+def pool() -> psycopg2.pool.ThreadedConnectionPool:
     return psycopg2.pool.ThreadedConnectionPool(minconn=1,
                                                 maxconn=2,
                                                 host=os.getenv('PG_HOST'),
@@ -89,5 +99,7 @@ def pool():
                                                 connection_factory=StorageConnection)
 
 
-def create_conn() -> StorageConnection:
-    return pool().getconn()
+class StorageConnectionFactory:
+    @staticmethod
+    def create_conn() -> StorageConnection:
+        return pool().getconn()
