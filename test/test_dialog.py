@@ -41,10 +41,11 @@ class TestDialogHandler:
         factory = MockStorageConnectionFactory()
         user_id = '1'
         factory.storage.create_user(user_id)
-        request = create_request(user_id, 'какая-то комманда')
+        request = create_request(user_id, 'какая-то команда')
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
-        assert {'end_session': False, 'text': 'Неизвестная команда'} == handler.response
+        assert {'end_session': False, 'text': 'Неизвестная команда. Если нужна подсказка, '
+                                              'то есть команда "помощь"'} == handler.response
 
     def test_add_user(self):
         factory = MockStorageConnectionFactory()

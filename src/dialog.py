@@ -161,4 +161,4 @@ class DialogHandler:
                 self.start_standup(user_id)
                 return
 
-            self.response['text'] = 'Неизвестная команда'
+            self.response['text'] = 'Неизвестная команда. Если нужна подсказка, то есть команда "помощь"'
