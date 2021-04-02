@@ -7,7 +7,7 @@ from typing import Dict, Any
 class DialogHandler:
     tts_end = 'если вы закончили , скажите " у меня всё " , иначе скажите " продолжить " '
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
-    end_standup_re = re.compile('закончи(ть)? (стендап|стенд ап|standup|stand up)')
+    end_standup_re = re.compile('за(кончи|верши)(ть)? (стендап|стенд ап|standup|stand up)')
 
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
@@ -37,7 +37,8 @@ class DialogHandler:
                'командами "Начни стендап" или "Проведи стендап". Алиса будет вызывать участников ' \
                'и даст им одну минуту на рассказ, во время которой навык не будет воспринимать команды. ' \
                'По истечении этой минуты (или раннего завершения) можно сказать "у меня всё",' \
-               'и тогда Алиса вызовет следующего участника, или сказать "продолжить" для ещё одной минуты.'
+               'и тогда Алиса вызовет следующего участника, или сказать "продолжить" для ещё одной минуты.' \
+               'Так же в этот момент можно сказать "запомни тему ТЕМА".'
 
     def new_user(self, user_id: str):
         self.connection.create_user(user_id)
@@ -56,17 +57,20 @@ class DialogHandler:
                 self.response['tts'] += f'{speaker["first_name"]} , расскажи о прошедшем дне'
             self.response['tts'] += f' {self.tts() or ""} {self.tts_end}'
         except IndexError:
-            self.response['text'] = 'Это был последний участник команды'
-            themes = self.connection.get_team_themes(user_id)
-            theme_list = []
-            for theme in themes:
-                if theme['theme']:
-                    theme_list.append(f'у {theme["first_name"].capitalize()} была тема "{theme["theme"]}"')
-            if theme_list:
-                self.response['text'] += '. Сегодня ' + ', '.join(theme_list)
-            self.response['text'] += '.\nЗавершаю сессию'
-            self.response['end_session'] = True
-            self.connection.reset_user(user_id)
+            self.end_standup(user_id)
+
+    def end_standup(self, user_id):
+        self.response['text'] = 'Это был последний участник команды'
+        themes = self.connection.get_team_themes(user_id)
+        theme_list = []
+        for theme in themes:
+            if theme['theme']:
+                theme_list.append(f'у {theme["first_name"].capitalize()} была тема "{theme["theme"]}"')
+        if theme_list:
+            self.response['text'] += '. Сегодня ' + ', '.join(theme_list)
+        self.response['text'] += '.\nЗавершаю сессию'
+        self.response['end_session'] = True
+        self.connection.reset_user(user_id)
 
     def add_team_member(self, user_id: str, names: Dict[str, str]):
         first_name = names.get('first_name', '')
@@ -128,11 +132,13 @@ class DialogHandler:
                 elif req['request']['command'].startswith('запомни тему '):
                     self.add_theme(user_id, req['request'])
                 elif self.end_standup_re.match(req['request']['command']):
-                    self.connection.reset_user(user_id)
-                    self.response['text'] = 'Стендап завершен'
-                else:  # Тут человек по идее говорит "продолжить", но мы съедаем все слова
+                    self.end_standup(user_id)
+                elif req['request']['command'] == 'продолжить':
                     self.response['text'] = ' '  # Игнорируем не команды
                     self.response['tts'] = f'{self.tts() or ""} + {self.tts_end}'
+                else:
+                    self.response['text'] = 'Не смогла распознать команду. В текущий момент могу распознать следующие ' \
+                                            'команды: "у меня всё", "продолжить", "запомнить тему ТЕМА", "закончи стендап"'
                 return
 
             if req['request']['command'] == 'помощь':
