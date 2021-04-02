@@ -1,10 +1,12 @@
-import ssl
 import logging
 import os
+import ssl
+
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
-from storage import StorageConnectionFactory
+
 from dialog import DialogHandler
+from storage import StorageConnectionFactory
 
 application = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)

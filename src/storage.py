@@ -1,9 +1,10 @@
+import functools
 import os
 from typing import Dict, List
+
 import psycopg2
 import psycopg2.extensions
 import psycopg2.pool
-import functools
 
 
 class StorageConnection(psycopg2.extensions.connection):
@@ -83,7 +84,7 @@ class StorageConnection(psycopg2.extensions.connection):
         return next_speaker
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        res = super(StorageConnection, self).__exit__(exc_type, exc_val, exc_tb)
+        res = super().__exit__(exc_type, exc_val, exc_tb)
         pool().putconn(self)
         return res
 
