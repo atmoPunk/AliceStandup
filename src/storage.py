@@ -98,9 +98,10 @@ class StorageConnection(psycopg2.extensions.connection):
                 cur.execute("""UPDATE persons SET last_theme = %s WHERE standup_organizer = %s AND first_name = %s AND last_name = %s""",
                             (theme, user_id, speaker['first_name'], speaker['last_name']))
 
-    def get_team_themes(self, user_id: str) -> Dict[str, str]:
+    def get_team_themes(self, user_id: str) -> List[Dict[str, str]]:
         with self.cursor() as cur:
-            cur.execute("""SELECT first_name, last_name, last_theme FROM persons WHERE standup_organizer = %s""", (user_id,))
+            cur.execute("""SELECT first_name, last_name, last_theme FROM persons WHERE standup_organizer = %s""",
+                        (user_id,))
             themes = cur.fetchall()
             result = []
             for theme in themes:

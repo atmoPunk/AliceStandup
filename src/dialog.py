@@ -12,7 +12,7 @@ class DialogHandler:
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
         self.connection = None
-        self.response = {'end_session': False, 'text': ' '}
+        self.response: Dict[str, Any] = {'end_session': False}
 
     def returning_greeting(self, user_id: str):
         greeting = 'Привет. Я тебя помню, твоя команда: '
@@ -47,14 +47,18 @@ class DialogHandler:
     def call_next(self, user_id: str):
         try:
             speaker = self.connection.call_next_speaker(user_id)
+            name = speaker['first_name'].capitalize()
+            if speaker['last_name'] != '':
+                name += ' ' + speaker['last_name'].capitalize()
+            text = f'{name}, расскажи о прошедшем дне'
             if 'text' not in self.response:
-                self.response['text'] = f'{speaker["first_name"].capitalize()}, расскажи о прошедшем дне'
+                self.response['text'] = text
             else:
-                self.response['text'] += f'{speaker["first_name"].capitalize()}, расскажи о прошедшем дне'
+                self.response['text'] += text
             if 'tts' not in self.response:
-                self.response['tts'] = f'{speaker["first_name"]} , расскажи о прошедшем дне'
+                self.response['tts'] = text
             else:
-                self.response['tts'] += f'{speaker["first_name"]} , расскажи о прошедшем дне'
+                self.response['tts'] += text
             self.response['tts'] += f' {self.tts() or ""} {self.tts_end}'
         except IndexError:
             self.end_standup(user_id)
@@ -65,7 +69,11 @@ class DialogHandler:
         theme_list = []
         for theme in themes:
             if theme['theme']:
-                theme_list.append(f'у {theme["first_name"].capitalize()} была тема "{theme["theme"]}"')
+                name = theme['first_name'].capitalize()
+                if theme['last_name'] != '':
+                    name += ' ' + theme['last_name'].capitalize()
+                theme_list.append(f'у {name} '
+                                  f'была тема "{theme["theme"]}"')  # TODO: Исправить падежи
         if theme_list:
             self.response['text'] += '. Сегодня ' + ', '.join(theme_list)
         self.response['text'] += '.\nЗавершаю сессию'
@@ -117,6 +125,7 @@ class DialogHandler:
             return
 
         user_id = req['session']['user']['user_id']
+
         # Этот context manager закоммитит транзакцию и вернет соединение в пул
         with self.connection_factory.create_conn() as connection:
             self.connection = connection

@@ -42,7 +42,9 @@ class MockStorage:
         return self.storage[user_id]['team']
 
     def get_team_member(self, user_id: str, member_idx: int) -> Dict[str, str]:
-        return self.storage[user_id]['team'][member_idx]
+        member = self.storage[user_id]['team'][member_idx]
+        member['last_name'] = member.get('last_name', '')
+        return member
 
     def set_theme_for_current_speaker(self, user_id: str, theme: str):
         speaker = self.get_team_member(user_id, self.storage[user_id]['cur_speaker'] - 1)
@@ -51,8 +53,11 @@ class MockStorage:
                 self.storage[user_id]['team'][idx]['theme'] = theme
                 break
 
-    def get_team_themes(self, user_id: str) -> Dict[str, str]:
-        return self.storage[user_id]['team']
+    def get_team_themes(self, user_id: str) -> List[Dict[str, str]]:
+        team = self.storage[user_id]['team']
+        for member in team:
+            member['last_name'] = member.get('last_name', '')
+        return team
 
     def call_next_speaker(self, user_id: str) -> Dict[str, str]:
         speaker = self.get_team_member(user_id, self.storage[user_id]['cur_speaker'])

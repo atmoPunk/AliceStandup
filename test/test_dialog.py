@@ -84,7 +84,7 @@ class TestDialogHandler:
         handler.handle_dialog(request)
         assert factory.storage.storage[user_id]['standup_held']
         assert {'end_session': False, 'text': 'Хорошо, начинаю.\nВова, расскажи о прошедшем дне',
-                'tts': 'хорошо , начинаю .вова , расскажи о прошедшем дне  если вы закончили '
+                'tts': 'хорошо , начинаю .Вова, расскажи о прошедшем дне  если вы закончили '
                 ', скажите " у меня всё " , иначе скажите " продолжить " '} == handler.response
         assert 1 == factory.storage.storage[user_id]['cur_speaker']
 
@@ -99,8 +99,8 @@ class TestDialogHandler:
         request = create_request(user_id, 'у меня все')
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
-        assert {'end_session': False, 'text': ' Дима, расскажи о прошедшем дне',
-                'tts': 'дима , расскажи о прошедшем дне  если вы закончили '
+        assert {'end_session': False, 'text': 'Дима Иванов, расскажи о прошедшем дне',
+                'tts': 'Дима Иванов, расскажи о прошедшем дне  если вы закончили '
                 ', скажите " у меня всё " , иначе скажите " продолжить " '} == handler.response
         assert 2 == factory.storage.storage[user_id]['cur_speaker']
 
@@ -165,4 +165,4 @@ class TestDialogHandler:
         assert factory.storage.storage[user_id]['team'][0]['theme'] is None
         assert factory.storage.storage[user_id]['team'][1]['theme'] is None
         assert {'end_session': True, 'text': 'Это был последний участник команды. Сегодня у Вова была тема "чай", '
-                                             'у Дима была тема "кофе".\nЗавершаю сессию'} == handler.response
+                                             'у Дима Иванов была тема "кофе".\nЗавершаю сессию'} == handler.response
