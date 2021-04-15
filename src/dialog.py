@@ -1,9 +1,12 @@
+import datetime
 import logging
 import os
 import random
 import re
 from request import Request
-from typing import Dict, Any
+from typing import Dict, Any, List
+import jwt
+import requests
 
 
 class DialogHandler:
@@ -51,6 +54,36 @@ class DialogHandler:
                'Так же в этот момент можно сказать "запомни тему ТЕМА". Темы будут повторены по окончанию стендапа' \
                'Если участник команды отсутствует, то его можно пропустить при помощи "его сегодня нет"' \
                'или "её сегодня нет"'
+
+    @staticmethod
+    def generate_github_jwt() -> str:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        delta_before = datetime.timedelta(0, 0, 0, 0, -1, 0, 0)  # 1 minute
+        delta_after = datetime.timedelta(0, 0, 0, 0, 10, 0, 0)  # 10 minutes
+        key = os.getenv('GITHUB_APP_KEY')
+        payload = {
+            'exp': now + delta_after,
+            'ias': now + delta_before,
+            'iss': 109929
+        }
+        return jwt.encode(payload, key, algorithm='RS256')
+
+    @staticmethod
+    def get_installation_token() -> str:
+        app_token = DialogHandler.generate_github_jwt()
+        headers = {'Authorization': f'Bearer {app_token}', 'Accept': 'application/vnd.github.v3+json'}
+        response = requests.post(
+            f'https://api.github.com/app/installations/{os.getenv("INSTALLATION_ID")}/access_tokens',
+            headers=headers).json()
+        return response['token']
+
+    @staticmethod
+    def list_issues() -> List[str]:
+        token = DialogHandler.get_installation_token()
+        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
+        response = requests.get('https://api.github.com/repos/atmoPunk/AliceStandup/issues', headers=headers).json()
+        titles = [r['title'] for r in response]
+        return titles
 
     def new_user(self, user_id: str):
         self.connection.create_user(user_id)
@@ -181,6 +214,10 @@ class DialogHandler:
 
             if req.is_session_new():
                 return self.returning_greeting(req.user_id())
+
+            if req.command() == 'покажи тикеты':
+                self.response['text'] = ', '.join(DialogHandler.list_issues())
+                return
 
             if self.connection.check_standup(req.user_id()):  # user_id в текущий момент проводит стендап
                 return self.standup_mode(req)
