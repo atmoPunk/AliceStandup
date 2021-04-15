@@ -7,6 +7,7 @@ from request import Request
 from typing import Dict, Any, List
 import jwt
 import requests
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 
 class DialogHandler:
@@ -60,10 +61,11 @@ class DialogHandler:
         now = datetime.datetime.now(datetime.timezone.utc)
         delta_before = datetime.timedelta(0, 0, 0, 0, -1, 0, 0)  # 1 minute
         delta_after = datetime.timedelta(0, 0, 0, 0, 10, 0, 0)  # 10 minutes
-        key = os.getenv('GITHUB_APP_KEY')
+        keyfile = os.getenv('GITHUB_APP_KEY')
+        key = load_pem_private_key(keyfile)
         payload = {
-            'exp': now + delta_after,
-            'ias': now + delta_before,
+            'exp': int((now + delta_after).timestamp()),
+            'ias': int((now + delta_before).timestamp()),
             'iss': 109929
         }
         return jwt.encode(payload, key, algorithm='RS256')
