@@ -33,6 +33,8 @@ class DialogHandler:
     def help_message() -> str:
         return 'Привет. Я могу помочь провести стендап, но для начала мне нужно узнать ' \
                'участников команды. Для этого можно сказать "Добавь в команду ИМЯ". ' \
+               'Если не получается распознать имя, то можно воспользоваться командой' \
+               '"Добавь в команду человека с именем ИМЯ [и фамилией ФАМИЛИЯ]", но в ней нужно следить за падежами' \
                'После того, как все люди будут добавлены - можно будет начинать стендап ' \
                'командами "Начни стендап" или "Проведи стендап". Алиса будет вызывать участников ' \
                'и даст им одну минуту на рассказ, во время которой навык не будет воспринимать команды. ' \
@@ -91,6 +93,22 @@ class DialogHandler:
         self.connection.add_team_member(user_id, names)
         logging.info('Added Person(%r,%r) to %r\'s storage', first_name, last_name, user_id)
         self.response['text'] = f'Запомнила человека {last_name.capitalize()} {first_name.capitalize()}'
+
+    def add_team_member_no_intent(self, user_id: str, command: str):
+        # command should be: Добавь в команду человека с именем ИМЯ и фамилией ФАМИЛИЯ
+        split_lastname = command.split(' и фамилией ')
+        names = {}
+        if len(split_lastname) > 1:
+            names['last_name'] = split_lastname[1]
+        split_name = split_lastname[0].split(' с именем ')
+        if len(split_name) != 2:
+            self.response['text'] = 'К сожалению я не смогла распознать имя, попробуйте ещё раз'
+            return
+        names['first_name'] = split_name[1]
+        self.connection.add_team_member(user_id, names)
+        logging.info('Added %r to %r\'s storage', names, user_id)
+        self.response['text'] = f'Запомнила человека {names.get("last_name", "").capitalize()} ' \
+                                f'{names["first_name"].capitalize()}'
 
     def del_team_member(self, user_id: str, names: Dict[str, str]):
         first_name = names.get('first_name', '')
@@ -159,6 +177,10 @@ class DialogHandler:
             if 'team.newmember' in req['request']['nlu']['intents']:  # Добавление человека в команду
                 self.add_team_member(user_id,
                                      req['request']['nlu']['intents']['team.newmember']['slots']['name']['value'])
+                return
+
+            if req['request']['command'].startswith('добавь в команду человека с именем'):
+                self.add_team_member_no_intent(user_id, req['request']['command'])
                 return
 
             if 'team.delmember' in req['request']['nlu']['intents']:

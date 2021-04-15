@@ -64,6 +64,22 @@ class TestDialogHandler:
         assert {'end_session': False, 'text': 'Запомнила человека Иванов Дима'} == handler.response
         assert {'first_name': 'дима', 'last_name': 'иванов', 'theme': None} in factory.storage.storage[user_id]['team']
 
+    def test_add_user_no_intent(self):
+        factory = MockStorageConnectionFactory()
+        user_id = '1'
+        factory.storage.create_user(user_id)
+        request = create_request(user_id, 'добавь в команду человека с именем дима и фамилией иванов')
+        handler = DialogHandler(factory)
+        handler.handle_dialog(request)
+        assert {'end_session': False, 'text': 'Запомнила человека Иванов Дима'} == handler.response
+        assert {'first_name': 'дима', 'last_name': 'иванов', 'theme': None} in factory.storage.storage[user_id]['team']
+        request = create_request(user_id, 'добавь в команду человека с именем вова')
+        handler = DialogHandler(factory)
+        handler.handle_dialog(request)
+        assert {'end_session': False, 'text': 'Запомнила человека  Вова'} == handler.response
+        assert {'first_name': 'вова', 'theme': None} in factory.storage.storage[user_id]['team']
+
+
     def test_start_standup_empty(self):
         factory = MockStorageConnectionFactory()
         user_id = '1'
