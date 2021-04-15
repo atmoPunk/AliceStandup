@@ -61,11 +61,11 @@ class DialogHandler:
         now = datetime.datetime.now(datetime.timezone.utc)
         delta_before = datetime.timedelta(0, 0, 0, 0, -1, 0, 0)  # 1 minute
         delta_after = datetime.timedelta(0, 0, 0, 0, 10, 0, 0)  # 10 minutes
-        keyfile = os.getenv('GITHUB_APP_KEY')
-        key = load_pem_private_key(keyfile)
+        with open(os.getenv('GITHUB_APP_KEY'), 'rb') as keyfile:
+            key = load_pem_private_key(keyfile.read(), password=None)
         payload = {
             'exp': int((now + delta_after).timestamp()),
-            'ias': int((now + delta_before).timestamp()),
+            'iat': int((now + delta_before).timestamp()),
             'iss': 109929
         }
         return jwt.encode(payload, key, algorithm='RS256')
@@ -77,6 +77,7 @@ class DialogHandler:
         response = requests.post(
             f'https://api.github.com/app/installations/{os.getenv("INSTALLATION_ID")}/access_tokens',
             headers=headers).json()
+        logging.info('response from github: %r', response)
         return response['token']
 
     @staticmethod
@@ -84,6 +85,7 @@ class DialogHandler:
         token = DialogHandler.get_installation_token()
         headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
         response = requests.get('https://api.github.com/repos/atmoPunk/AliceStandup/issues', headers=headers).json()
+        logging.info('response from github: %r', response)
         titles = [r['title'] for r in response]
         return titles
 
