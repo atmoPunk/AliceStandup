@@ -8,6 +8,7 @@ class DialogHandler:
     tts_end = 'если вы закончили , скажите " у меня всё " , иначе скажите " продолжить " '
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
     end_standup_re = re.compile('за(кончи|верши)(ть)? (стендап|стенд ап|standup|stand up)')
+    skip_person_re = re.compile('е(го|ё) (сегодня|сейчас)? (нет|не будет)')
 
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
@@ -78,7 +79,7 @@ class DialogHandler:
                                   f'была тема "{theme["theme"]}"')  # TODO: Исправить падежи
         if theme_list:
             self.response['text'] += '. Сегодня ' + ', '.join(theme_list)
-        self.response['text'] += '.\nЗавершаю сессию'
+        self.response['text'] += '.\nХорошего вам дня.'
         self.response['end_session'] = True
         if 'tts' in self.response:
             del self.response['tts']
@@ -165,9 +166,13 @@ class DialogHandler:
                 elif req['request']['command'] == 'продолжить':
                     self.response['text'] = ' '  # Игнорируем не команды
                     self.response['tts'] = f'{self.tts() or ""} + {self.tts_end}'
+                elif self.skip_person_re.match(req['request']['command']):
+                    self.response['text'] = 'Хорошо, пропускаю.'
+                    self.call_next(user_id)
                 else:
-                    self.response['text'] = 'Не смогла распознать команду. В текущий момент могу распознать следующие ' \
-                                            'команды: "у меня всё", "продолжить", "запомнить тему ТЕМА", "закончи стендап"'
+                    self.response['text'] = 'Не смогла распознать команду. Во время проведения стендапа могу ' \
+                                            'распознать следующие команды: "у меня всё", "продолжить", ' \
+                                            '"его|её сегодня нет", "запомнить тему ТЕМА", "закончи стендап"'
                 return
 
             if req['request']['command'] == 'помощь':
