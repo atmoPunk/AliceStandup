@@ -1,7 +1,10 @@
 CREATE TABLE USERS( -- пользователи навыка
 	user_id TEXT PRIMARY KEY, -- user_id из навыка
 	standup_held BOOLEAN NOT NULL,
-	cur_speaker INTEGER NOT NULL
+	cur_speaker INTEGER NOT NULL,
+	github_login TEXT,
+	repo TEXT,
+	installation_id TEXT
 );
 
 CREATE TABLE PERSONS( -- участники команд

@@ -108,6 +108,17 @@ class StorageConnection(psycopg2.extensions.connection):
                 result.append({'first_name': theme[0], 'last_name': theme[1], 'theme': theme[2]})
             return result
 
+    def get_github_info(self, user_id: str):
+        with self.cursor() as cur:
+            cur.execute("""SELECT github_login, repo, installation_id FROM users WHERE user_id=%s""", (user_id,))
+            data = cur.fetchone()
+            return data
+
+    def register_github(self, user_id: str, name: str, repo: str, installation_id: str):
+        with self.cursor() as cur:
+            cur.execute("""UPDATE users SET github_login=%s, repo=%s, installation_id=%s WHERE user_id=%s""",
+                        (name, repo, installation_id, user_id))
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         res = super().__exit__(exc_type, exc_val, exc_tb)
         pool().putconn(self)
