@@ -245,6 +245,12 @@ class DialogHandler:
             if req.is_session_new():
                 return self.returning_greeting(req.user_id())
 
+            if req.command().startswith('запомни гитхаб'):
+                # Original utterance здесь, так как нам нужно именно то,
+                # что передали
+                self.register_github(req.user_id(), req.original_utterance())
+                return
+
             if req.command() == 'покажи тикеты':
                 self.response['text'] = ', '.join(self.list_issues(req.user_id()))
                 return
