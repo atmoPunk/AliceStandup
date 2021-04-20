@@ -79,7 +79,6 @@ class TestDialogHandler:
         assert {'end_session': False, 'text': 'Запомнила человека  Вова'} == handler.response
         assert {'first_name': 'вова', 'theme': None} in factory.storage.storage[user_id]['team']
 
-
     def test_start_standup_empty(self):
         factory = MockStorageConnectionFactory()
         user_id = '1'
@@ -87,7 +86,24 @@ class TestDialogHandler:
         request = create_request(user_id, 'начни стендап')
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
-        assert {'end_session': True, 'text': 'Это был последний участник команды.\nЗавершаю сессию'} == handler.response
+        assert {'end_session': True,
+                'text': 'Это был последний участник команды.\nХорошего вам дня.'} == handler.response
+
+    def test_skip_member(self):
+        factory = MockStorageConnectionFactory()
+        user_id = '1'
+        factory.storage.create_user(user_id)
+        factory.storage.add_team_member(user_id, {'first_name': 'дима', 'last_name': 'иванов'})
+        factory.storage.add_team_member(user_id, {'first_name': 'вова'})
+        factory.storage.storage[user_id]['cur_speaker'] = 1
+        factory.storage.storage[user_id]['standup_held'] = True
+        request = create_request(user_id, 'его сегодня нет')
+        handler = DialogHandler(factory)
+        handler.handle_dialog(request)
+        assert {'end_session': False, 'text': 'Хорошо, пропускаю.\nВова, расскажи о прошедшем дне',
+                'tts': 'хорошо , пропускаю .Вова, расскажи о прошедшем дне  если вы закончили '
+                ', скажите " у меня всё " , иначе скажите " продолжить " '} == handler.response
+        assert 2 == factory.storage.storage[user_id]['cur_speaker']
 
     def test_start_standup(self):
         factory = MockStorageConnectionFactory()
@@ -109,7 +125,7 @@ class TestDialogHandler:
         user_id = '1'
         factory.storage.create_user(user_id)
         factory.storage.add_team_member(user_id, {'first_name': 'вова'})
-        factory.storage.add_team_member(user_id, {'first_name': 'дима', 'last_name': 'Иванов'})
+        factory.storage.add_team_member(user_id, {'first_name': 'дима', 'last_name': 'иванов'})
         factory.storage.storage[user_id]['cur_speaker'] = 1
         factory.storage.storage[user_id]['standup_held'] = True
         request = create_request(user_id, 'у меня все')
@@ -131,7 +147,8 @@ class TestDialogHandler:
         request = create_request(user_id, 'у меня все')
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
-        assert {'end_session': True, 'text': 'Это был последний участник команды.\nЗавершаю сессию'} == handler.response
+        assert {'end_session': True,
+                'text': 'Это был последний участник команды.\nХорошего вам дня.'} == handler.response
         assert 0 == factory.storage.storage[user_id]['cur_speaker']
         assert not factory.storage.storage[user_id]['standup_held']
 
@@ -181,4 +198,4 @@ class TestDialogHandler:
         assert factory.storage.storage[user_id]['team'][0]['theme'] is None
         assert factory.storage.storage[user_id]['team'][1]['theme'] is None
         assert {'end_session': True, 'text': 'Это был последний участник команды. Сегодня у Вова была тема "чай", '
-                                             'у Дима Иванов была тема "кофе".\nЗавершаю сессию'} == handler.response
+                                             'у Дима Иванов была тема "кофе".\nХорошего вам дня.'} == handler.response

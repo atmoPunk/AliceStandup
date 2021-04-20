@@ -1,5 +1,6 @@
 import logging
 import os
+import random
 import re
 from typing import Dict, Any
 
@@ -9,6 +10,7 @@ class DialogHandler:
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
     end_standup_re = re.compile('за(кончи|верши)(ть)? (стендап|стенд ап|standup|stand up)')
     skip_person_re = re.compile('е(го|ё) (сегодня|сейчас)? (нет|не будет)')
+    greetings = ['Привет', 'Добрый день', 'Здравствуйте']
 
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
@@ -16,14 +18,17 @@ class DialogHandler:
         self.response: Dict[str, Any] = {'end_session': False}
 
     def returning_greeting(self, user_id: str):
-        greeting = 'Привет. Я тебя помню, твоя команда: '
-        team = self.connection.get_team(user_id)
-        names = [f'{person["last_name"].capitalize()} {person["first_name"].capitalize()}' for person in team]
-        team_names = ', '.join(names)
-        self.response['text'] = greeting + team_names + '.'
+        greeting = random.choice(self.greetings)
+        self.response['text'] = greeting + '.'
         if self.connection.check_standup(user_id):
             self.response['text'] += '\nВы остались в состоянии проведения стендапа в прошлый раз. ' \
                                      'Чтобы выйти из этого состояния, скажите "закончить стендап"'
+
+    def remind_team(self, user_id: str):
+        team = self.connection.get_team(user_id)
+        names = [f'{person["last_name"].capitalize()} {person["first_name"].capitalize()}' for person in team]
+        team_names = ', '.join(names)
+        self.response['text'] = 'Твоя команда: ' + team_names
 
     @staticmethod
     def tts() -> str:
@@ -36,12 +41,15 @@ class DialogHandler:
                'участников команды. Для этого можно сказать "Добавь в команду ИМЯ". ' \
                'Если не получается распознать имя, то можно воспользоваться командой' \
                '"Добавь в команду человека с именем ИМЯ [и фамилией ФАМИЛИЯ]", но в ней нужно следить за падежами' \
+               'Чтобы посмотреть текущий состав команды можно сказать "Напомни команду"' \
                'После того, как все люди будут добавлены - можно будет начинать стендап ' \
                'командами "Начни стендап" или "Проведи стендап". Алиса будет вызывать участников ' \
-               'и даст им одну минуту на рассказ, во время которой навык не будет воспринимать команды. ' \
-               'По истечении этой минуты (или раннего завершения) можно сказать "у меня всё",' \
-               'и тогда Алиса вызовет следующего участника, или сказать "продолжить" для ещё одной минуты.' \
-               'Так же в этот момент можно сказать "запомни тему ТЕМА".'
+               'и даст им две минуты на рассказ, во время которой навык не будет воспринимать команды. ' \
+               'По истечении этого времени (или раннего завершения) можно сказать "у меня всё",' \
+               'и тогда Алиса вызовет следующего участника, или сказать "продолжить" для дополнительного времени.' \
+               'Так же в этот момент можно сказать "запомни тему ТЕМА". Темы будут повторены по окончанию стендапа' \
+               'Если участник команды отсутствует, то его можно пропустить при помощи "его сегодня нет"' \
+               'или "её сегодня нет"'
 
     def new_user(self, user_id: str):
         self.connection.create_user(user_id)
@@ -167,7 +175,8 @@ class DialogHandler:
                     self.response['text'] = ' '  # Игнорируем не команды
                     self.response['tts'] = f'{self.tts() or ""} + {self.tts_end}'
                 elif self.skip_person_re.match(req['request']['command']):
-                    self.response['text'] = 'Хорошо, пропускаю.'
+                    self.response['text'] = 'Хорошо, пропускаю.\n'
+                    self.response['tts'] = 'хорошо , пропускаю .'
                     self.call_next(user_id)
                 else:
                     self.response['text'] = 'Не смогла распознать команду. Во время проведения стендапа могу ' \
@@ -186,6 +195,10 @@ class DialogHandler:
 
             if req['request']['command'].startswith('добавь в команду человека с именем'):
                 self.add_team_member_no_intent(user_id, req['request']['command'])
+                return
+
+            if req['request']['command'] == 'напомни команду':
+                self.remind_team(user_id)
                 return
 
             if 'team.delmember' in req['request']['nlu']['intents']:
