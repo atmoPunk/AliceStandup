@@ -9,6 +9,7 @@ import jwt
 import requests
 from cachetools import cached, TTLCache
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from requests import HTTPError
 
 
 class GithubInteraction:
@@ -34,17 +35,21 @@ class GithubInteraction:
         headers = {'Authorization': f'Bearer {app_token}', 'Accept': 'application/vnd.github.v3+json'}
         response = requests.post(
             f'https://api.github.com/app/installations/{installation}/access_tokens', headers=headers
-        ).json()
-        logging.info('response from github: %r', response)
-        return response['token']
+        )
+        response.raise_for_status()
+        data = response.json()
+        logging.info('response from github: %r', data)
+        return data['token']
 
     @staticmethod
     def list_issues(user: str, repo: str, installation: str) -> List[str]:
         token = GithubInteraction.get_installation_token(installation)
         headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
-        response = requests.get(f'https://api.github.com/repos/{user}/{repo}/issues', headers=headers).json()
-        logging.info('response from github: %r', response)
-        titles = [r['title'] for r in response]
+        response = requests.get(f'https://api.github.com/repos/{user}/{repo}/issues', headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        logging.info('response from github: %r', data)
+        titles = [r['title'] for r in data]
         return titles
 
 
@@ -181,9 +186,15 @@ class DialogHandler:
         if username is None or repo is None or installation is None:
             self.response['text'] = 'Пожалуйста предоставьте свой логин, название репозитория и installation id.' \
                                     ' Это сделать можно воспользовавшись командой ' \
-                                    '"запомни гитхаб ЛОГИН РЕПО INSTALLATION_ID"'
+                                    '"Запомни гитхаб ЛОГИН РЕПО INSTALLATION_ID"'
             return
-        return GithubInteraction.list_issues(username, repo, installation)
+        try:
+            issues = GithubInteraction.list_issues(username, repo, installation)
+            self.response['text'] = ', '.join(issues)
+        except HTTPError:
+            self.response['text'] = f'Возникла ошибка в получении тикетов. Возможно это связано с неправильными ' \
+                                    f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
+                                    f' {repo}, Installation_id: {installation}.'
 
     def register_github(self, user_id: str, command: str):
         splits = command.split(' ')
@@ -252,7 +263,7 @@ class DialogHandler:
                 return
 
             if req.command() == 'покажи тикеты':
-                self.response['text'] = ', '.join(self.list_issues(req.user_id()))
+                self.list_issues(req.user_id())
                 return
 
             if self.connection.check_standup(req.user_id()):  # user_id в текущий момент проводит стендап
