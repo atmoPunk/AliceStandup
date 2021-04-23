@@ -15,7 +15,6 @@ class DialogHandler:
     skip_person_re = re.compile('е(го|ё) (сегодня|сейчас)? (нет|не будет)')
     greetings = ['Привет', 'Добрый день', 'Здравствуйте']
     close_issue_re = re.compile('закрой (issue|тикет) ([0-9]+)')
-    
 
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
