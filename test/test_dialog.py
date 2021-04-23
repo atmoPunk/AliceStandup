@@ -1,29 +1,30 @@
 from typing import Dict, Any, Optional
 
 from mock_connection import MockStorageConnectionFactory
-from src.dialog import DialogHandler
+from dialog import DialogHandler
+from request import Request
 
 
-def create_request(user_id: str, command: str, new: bool = False) -> Dict[str, Any]:
-    return {'session': {'user': {'user_id': user_id}, 'new': new},
-            'request': {'command': command, 'nlu': {'intents': {}}}}
+def create_request(user_id: str, command: str, new: bool = False) -> Request:
+    return Request({'session': {'user': {'user_id': user_id}, 'new': new},
+                    'request': {'command': command, 'nlu': {'intents': {}}}})
 
 
-def add_name_intent(request: Dict[str, Any], first_name: str, last_name: Optional[str]):
+def add_name_intent(request: Request, first_name: str, last_name: Optional[str]):
     if last_name:
-        request['request']['nlu']['intents']['team.newmember'] = {
+        request._req['request']['nlu']['intents']['team.newmember'] = {
                 'slots': {'name': {'value': {'first_name': first_name, 'last_name': last_name}}}}
     else:
-        request['request']['nlu']['intents']['team.newmember'] = {
+        request._req['request']['nlu']['intents']['team.newmember'] = {
             'slots': {'name': {'value': {'first_name': first_name}}}}
 
 
-def add_del_intent(request: Dict[str, Any], first_name: str, last_name: Optional[str]):
+def add_del_intent(request: Request, first_name: str, last_name: Optional[str]):
     if last_name:
-        request['request']['nlu']['intents']['team.delmember'] = {
+        request._req['request']['nlu']['intents']['team.delmember'] = {
             'slots': {'name': {'value': {'first_name': first_name, 'last_name': last_name}}}}
     else:
-        request['request']['nlu']['intents']['team.delmember'] = {
+        request._req['request']['nlu']['intents']['team.delmember'] = {
             'slots': {'name': {'value': {'first_name': first_name}}}}
 
 
