@@ -2,6 +2,7 @@ import logging
 import os
 import random
 import re
+from request import Request
 from typing import Dict, Any
 
 
@@ -103,9 +104,9 @@ class DialogHandler:
         logging.info('Added Person(%r,%r) to %r\'s storage', first_name, last_name, user_id)
         self.response['text'] = f'Запомнила человека {last_name.capitalize()} {first_name.capitalize()}'
 
-    def add_team_member_no_intent(self, user_id: str, command: str):
+    def add_team_member_no_intent(self, req: Request):
         # command should be: Добавь в команду человека с именем ИМЯ и фамилией ФАМИЛИЯ
-        split_lastname = command.split(' и фамилией ')
+        split_lastname = req.command().split(' и фамилией ')
         names = {}
         if len(split_lastname) > 1:
             names['last_name'] = split_lastname[1]
@@ -114,8 +115,8 @@ class DialogHandler:
             self.response['text'] = 'К сожалению я не смогла распознать имя, попробуйте ещё раз'
             return
         names['first_name'] = split_name[1]
-        self.connection.add_team_member(user_id, names)
-        logging.info('Added %r to %r\'s storage', names, user_id)
+        self.connection.add_team_member(req.user_id(), names)
+        logging.info('Added %r to %r\'s storage', names, req.user_id())
         self.response['text'] = f'Запомнила человека {names.get("last_name", "").capitalize()} ' \
                                 f'{names["first_name"].capitalize()}'
 
@@ -139,75 +140,68 @@ class DialogHandler:
         self.connection.start_standup(user_id)
         self.call_next(user_id)
 
-    def add_theme(self, user_id: str, request: Dict[str, Any]):
-        theme = request['command'][13:]
-        self.connection.set_theme_for_current_speaker(user_id, theme)
+    def add_theme(self, req: Request):
+        theme = req.command()[13:]
+        self.connection.set_theme_for_current_speaker(req.user_id(), theme)
         self.response['text'] = f'Запомнила тему "{theme}"'
 
-    def handle_dialog(self, req: Dict[str, Any]):
-        if 'user' not in req['session']:  # Не умеем работать с неавторизованными пользователями
+    def standup_mode(self, req: Request):
+        if req.command() == 'у меня все' or req.command() == 'у меня всё':
+            self.call_next(req.user_id())
+        elif req.command().startswith('запомни тему '):
+            self.add_theme(req)
+        elif self.end_standup_re.match(req.command()):
+            self.end_standup(req.user_id())
+        elif req.command() == 'продолжить':
+            self.response['text'] = ' '  # Игнорируем не команды
+            self.response['tts'] = f'{self.tts() or ""} + {self.tts_end}'
+        elif self.skip_person_re.match(req.command()):
+            self.response['text'] = 'Хорошо, пропускаю.\n'
+            self.response['tts'] = 'хорошо , пропускаю .'
+            self.call_next(req.user_id())
+        else:
+            self.response['text'] = 'Не смогла распознать команду. Во время проведения стендапа могу ' \
+                                    'распознать следующие команды: "у меня всё", "продолжить", ' \
+                                    '"его|её сегодня нет", "запомнить тему ТЕМА", "закончи стендап"'
+        return
+
+    def handle_dialog(self, req: Request):
+        if not req.is_authorized():  # Не умеем работать с неавторизованными пользователями
             self.response['text'] = 'Привет. К сожалению, я не могу работать с неавторизованными пользователями. ' \
                                     'Пожалуйста, зайдите в свой аккаунт и попробуйте снова'
             self.response['end_session'] = True
             return
 
-        user_id = req['session']['user']['user_id']
-
         # Этот context manager закоммитит транзакцию и вернет соединение в пул
         with self.connection_factory.create_conn() as connection:
             self.connection = connection
-            if not self.connection.check_user_exists(user_id):  # Новый пользователь
-                self.new_user(user_id)
-                return
+            if not self.connection.check_user_exists(req.user_id()):  # Новый пользователь
+                return self.new_user(req.user_id())
 
-            if req['session']['new']:
-                self.returning_greeting(user_id)
-                return
+            if req.is_session_new():
+                return self.returning_greeting(req.user_id())
 
-            if self.connection.check_standup(user_id):  # user_id в текущий момент проводит стендап
-                if req['request']['command'] == 'у меня все' or req['request']['command'] == 'у меня всё':
-                    self.call_next(user_id)
-                elif req['request']['command'].startswith('запомни тему '):
-                    self.add_theme(user_id, req['request'])
-                elif self.end_standup_re.match(req['request']['command']):
-                    self.end_standup(user_id)
-                elif req['request']['command'] == 'продолжить':
-                    self.response['text'] = ' '  # Игнорируем не команды
-                    self.response['tts'] = f'{self.tts() or ""} + {self.tts_end}'
-                elif self.skip_person_re.match(req['request']['command']):
-                    self.response['text'] = 'Хорошо, пропускаю.\n'
-                    self.response['tts'] = 'хорошо , пропускаю .'
-                    self.call_next(user_id)
-                else:
-                    self.response['text'] = 'Не смогла распознать команду. Во время проведения стендапа могу ' \
-                                            'распознать следующие команды: "у меня всё", "продолжить", ' \
-                                            '"его|её сегодня нет", "запомнить тему ТЕМА", "закончи стендап"'
-                return
+            if self.connection.check_standup(req.user_id()):  # user_id в текущий момент проводит стендап
+                return self.standup_mode(req)
 
-            if req['request']['command'] == 'помощь':
+            if req.command() == 'помощь':
                 self.response['text'] = self.help_message()
                 return
 
-            if 'team.newmember' in req['request']['nlu']['intents']:  # Добавление человека в команду
-                self.add_team_member(user_id,
-                                     req['request']['nlu']['intents']['team.newmember']['slots']['name']['value'])
-                return
+            if req.command().startswith('добавь в команду человека с именем'):
+                return self.add_team_member_no_intent(req)
 
-            if req['request']['command'].startswith('добавь в команду человека с именем'):
-                self.add_team_member_no_intent(user_id, req['request']['command'])
-                return
+            if req.command() == 'напомни команду':
+                return self.remind_team(req.user_id())
 
-            if req['request']['command'] == 'напомни команду':
-                self.remind_team(user_id)
-                return
+            if self.begin_standup_re.match(req.command()):
+                return self.start_standup(req.user_id())
 
-            if 'team.delmember' in req['request']['nlu']['intents']:
-                self.del_team_member(user_id,
-                                     req['request']['nlu']['intents']['team.delmember']['slots']['name']['value'])
-                return
+            intents = req.intents()
+            if 'team.newmember' in intents:
+                return self.add_team_member(req.user_id(), intents['team.newmember']['slots']['name']['value'])
 
-            if self.begin_standup_re.match(req['request']['command']):
-                self.start_standup(user_id)
-                return
+            if 'team.delmember' in intents:
+                return self.del_team_member(req.user_id(), intents['team.delmember']['slots']['name']['value'])
 
             self.response['text'] = 'Неизвестная команда. Если нужна подсказка, то есть команда "помощь"'
