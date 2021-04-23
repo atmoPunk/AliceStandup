@@ -82,7 +82,7 @@ class DialogHandler:
         for theme in themes:
             if theme['theme']:
                 name = theme['first_name'].capitalize()
-                if theme['last_name'] != '':
+                if theme['last_name'] is not None and theme['last_name'] != '':
                     name += ' ' + theme['last_name'].capitalize()
                 theme_list.append(f'у {name} '
                                   f'была тема "{theme["theme"]}"')  # TODO: Исправить падежи
@@ -144,6 +144,7 @@ class DialogHandler:
         theme = req.command()[13:]
         self.connection.set_theme_for_current_speaker(req.user_id(), theme)
         self.response['text'] = f'Запомнила тему "{theme}"'
+        self.response['tts'] = f'запомнила тему {theme} . {self.tts() or ""} {self.tts_end}'
 
     def standup_mode(self, req: Request):
         if req.command() == 'у меня все' or req.command() == 'у меня всё':
@@ -154,7 +155,7 @@ class DialogHandler:
             self.end_standup(req.user_id())
         elif req.command() == 'продолжить':
             self.response['text'] = ' '  # Игнорируем не команды
-            self.response['tts'] = f'{self.tts() or ""} + {self.tts_end}'
+            self.response['tts'] = f'{self.tts() or ""} {self.tts_end}'
         elif self.skip_person_re.match(req.command()):
             self.response['text'] = 'Хорошо, пропускаю.\n'
             self.response['tts'] = 'хорошо , пропускаю .'

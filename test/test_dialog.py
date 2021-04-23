@@ -182,7 +182,9 @@ class TestDialogHandler:
         request = create_request(user_id, 'запомни тему чай')
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
-        assert {'end_session': False, 'text': 'Запомнила тему "чай"'} == handler.response
+        assert {'end_session': False, 'text': 'Запомнила тему "чай"',
+                'tts': 'запомнила тему чай .  если вы закончили , скажите '
+                       '" у меня всё " , иначе скажите " продолжить " '} == handler.response
         assert factory.storage.storage[user_id]['team'][0]['theme'] == 'чай'
         request = create_request(user_id, 'у меня всё')
         handler = DialogHandler(factory)
@@ -191,7 +193,9 @@ class TestDialogHandler:
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
         assert factory.storage.storage[user_id]['team'][1]['theme'] == 'кофе'
-        assert {'end_session': False, 'text': 'Запомнила тему "кофе"'} == handler.response
+        assert {'end_session': False, 'text': 'Запомнила тему "кофе"',
+                'tts': 'запомнила тему кофе .  если вы закончили , скажите '
+                       '" у меня всё " , иначе скажите " продолжить " '} == handler.response
         request = create_request(user_id, 'у меня всё')
         handler = DialogHandler(factory)
         handler.handle_dialog(request)
