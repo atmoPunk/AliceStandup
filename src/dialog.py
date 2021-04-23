@@ -1,56 +1,11 @@
-import datetime
 import logging
 import os
 import random
 import re
 from request import Request
-from typing import Dict, Any, List
-import jwt
-import requests
-from cachetools import cached, TTLCache
-from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from typing import Dict, Any
+from github import list_issues, close_issue
 from requests import HTTPError
-
-
-class GithubInteraction:
-    @staticmethod
-    @cached(TTLCache(maxsize=1, ttl=600))
-    def github_jwt() -> str:
-        now = datetime.datetime.now(datetime.timezone.utc)
-        delta_before = datetime.timedelta(0, 0, 0, 0, -1, 0, 0)  # 1 minute
-        delta_after = datetime.timedelta(0, 0, 0, 0, 10, 0, 0)  # 10 minutes
-        with open(os.getenv('GITHUB_APP_KEY'), 'rb') as keyfile:
-            key = load_pem_private_key(keyfile.read(), password=None)
-        payload = {
-            'exp': int((now + delta_after).timestamp()),
-            'iat': int((now + delta_before).timestamp()),
-            'iss': 109929
-        }
-        return jwt.encode(payload, key, algorithm='RS256')
-
-    @staticmethod
-    @cached(TTLCache(maxsize=10, ttl=600))
-    def get_installation_token(installation) -> str:
-        app_token = GithubInteraction.github_jwt()
-        headers = {'Authorization': f'Bearer {app_token}', 'Accept': 'application/vnd.github.v3+json'}
-        response = requests.post(
-            f'https://api.github.com/app/installations/{installation}/access_tokens', headers=headers
-        )
-        response.raise_for_status()
-        data = response.json()
-        logging.info('response from github: %r', data)
-        return data['token']
-
-    @staticmethod
-    def list_issues(user: str, repo: str, installation: str) -> List[str]:
-        token = GithubInteraction.get_installation_token(installation)
-        headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
-        response = requests.get(f'https://api.github.com/repos/{user}/{repo}/issues', headers=headers)
-        response.raise_for_status()
-        data = response.json()
-        logging.info('response from github: %r', data)
-        titles = [r['title'] for r in data]
-        return titles
 
 
 class DialogHandler:
@@ -59,6 +14,8 @@ class DialogHandler:
     end_standup_re = re.compile('за(кончи|верши)(ть)? (стендап|стенд ап|standup|stand up)')
     skip_person_re = re.compile('е(го|ё) (сегодня|сейчас)? (нет|не будет)')
     greetings = ['Привет', 'Добрый день', 'Здравствуйте']
+    close_issue_re = re.compile('закрой (issue|тикет) ([0-9]+)')
+    
 
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
@@ -181,17 +138,21 @@ class DialogHandler:
         else:
             self.response['text'] = f'Не смогла удалить {last_name.capitalize()} {first_name.capitalize()}'
 
+    def github_auth_help(self):
+        self.response['text'] = 'Пожалуйста предоставьте свой логин, название репозитория и installation id.' \
+                                ' Это сделать можно воспользовавшись командой ' \
+                                '"Запомни гитхаб ЛОГИН РЕПО INSTALLATION_ID"'
+        return
+
     def list_issues(self, user_id: str):
         username, repo, installation = self.connection.get_github_info(user_id)
         if username is None or repo is None or installation is None:
-            self.response['text'] = 'Пожалуйста предоставьте свой логин, название репозитория и installation id.' \
-                                    ' Это сделать можно воспользовавшись командой ' \
-                                    '"Запомни гитхаб ЛОГИН РЕПО INSTALLATION_ID"'
-            return
+            return self.github_auth_help()
         try:
-            issues = GithubInteraction.list_issues(username, repo, installation)
+            issues = list_issues(username, repo, installation)
             self.response['text'] = ', '.join(issues)
-        except HTTPError:
+        except HTTPError as e:
+            logging.info(e)
             self.response['text'] = f'Возникла ошибка в получении тикетов. Возможно это связано с неправильными ' \
                                     f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
                                     f' {repo}, Installation_id: {installation}.'
@@ -213,6 +174,19 @@ class DialogHandler:
         self.response['tts'] = 'хорошо , начинаю .'
         self.connection.start_standup(user_id)
         self.call_next(user_id)
+
+    def close_issue(self, user_id: str, issue_number: int):
+        username, repo, installation = self.connection.get_github_info(user_id)
+        if username is None or repo is None or installation is None:
+            return self.github_auth_help()
+        try:
+            close_issue(username, repo, installation, issue_number)
+            self.response['text'] = 'Тикет успешно закрыт'
+        except HTTPError as e:
+            logging.info(e)
+            self.response['text'] = f'Возникла ошибка в закрытии тикета. Возможно это связано с неправильными ' \
+                                    f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
+                                    f' {repo}, Installation_id: {installation}, номер тикета: {issue_number}.'
 
     def add_theme(self, req: Request):
         theme = req.command()[13:]
@@ -265,6 +239,9 @@ class DialogHandler:
             if req.command() == 'покажи тикеты':
                 self.list_issues(req.user_id())
                 return
+
+            if ci := self.close_issue_re.match(req.command()):
+                return self.close_issue(req.user_id(), int(ci.group(2)))
 
             if self.connection.check_standup(req.user_id()):  # user_id в текущий момент проводит стендап
                 return self.standup_mode(req)
