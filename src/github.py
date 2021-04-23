@@ -54,7 +54,7 @@ def close_issue(user: str, repo: str, installation: str, issue_number: int):
     params = {'state': 'closed'}
     response = requests.patch(f'https://api.github.com/repos/{user}/{repo}/issues/{issue_number}',
                               headers=headers,
-                              data=params)
+                              json=params)
     response.raise_for_status()
     data = response.json()
     logging.info('response from github: %r', data)
