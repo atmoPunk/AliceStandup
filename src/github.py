@@ -43,7 +43,8 @@ def list_issues(user: str, repo: str, installation: str) -> List[str]:
     response.raise_for_status()
     data = response.json()
     logging.info('response from github: %r', data)
-    titles = [r['title'] for r in data]
+    titles = [f"{r['number']}. {r['title']}" for r in data if 'pull_request' not in r]
+    titles = titles[:10]
     return titles
 
 
