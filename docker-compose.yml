@@ -15,6 +15,7 @@ services:
       - TTS_FILENAME
       - INSTALLATION_ID
       - GITHUB_APP_KEY
+      - GITHUB_APP_ID
     volumes:
       - ${SSL_CERT}:${SSL_CERT}
       - ${SSL_KEY}:${SSL_KEY}
