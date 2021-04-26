@@ -2,10 +2,12 @@ import logging
 import os
 import random
 import re
-from request import Request
 from typing import Dict, Any
-from github import list_issues, close_issue
+
 from requests import HTTPError
+
+from github import list_issues, close_issue
+from request import Request
 
 
 class DialogHandler:
@@ -141,17 +143,17 @@ class DialogHandler:
         self.response['text'] = 'Пожалуйста предоставьте свой логин, название репозитория и installation id.' \
                                 ' Это сделать можно воспользовавшись командой ' \
                                 '"Запомни гитхаб ЛОГИН РЕПО INSTALLATION_ID"'
-        return
 
     def list_issues(self, user_id: str):
         username, repo, installation = self.connection.get_github_info(user_id)
         if username is None or repo is None or installation is None:
-            return self.github_auth_help()
+            self.github_auth_help()
+            return
         try:
             issues = list_issues(username, repo, installation)
             self.response['text'] = ', '.join(issues)
-        except HTTPError as e:
-            logging.info(e)
+        except HTTPError as err:
+            logging.info(err)
             self.response['text'] = f'Возникла ошибка в получении тикетов. Возможно это связано с неправильными ' \
                                     f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
                                     f' {repo}, Installation_id: {installation}.'
@@ -177,12 +179,13 @@ class DialogHandler:
     def close_issue(self, user_id: str, issue_number: int):
         username, repo, installation = self.connection.get_github_info(user_id)
         if username is None or repo is None or installation is None:
-            return self.github_auth_help()
+            self.github_auth_help()
+            return
         try:
             close_issue(username, repo, installation, issue_number)
             self.response['text'] = 'Тикет успешно закрыт'
-        except HTTPError as e:
-            logging.info(e)
+        except HTTPError as err:
+            logging.info(err)
             self.response['text'] = f'Возникла ошибка в закрытии тикета. Возможно это связано с неправильными ' \
                                     f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
                                     f' {repo}, Installation_id: {installation}, номер тикета: {issue_number}.'
@@ -211,7 +214,6 @@ class DialogHandler:
             self.response['text'] = 'Не смогла распознать команду. Во время проведения стендапа могу ' \
                                     'распознать следующие команды: "у меня всё", "продолжить", ' \
                                     '"его|её сегодня нет", "запомнить тему ТЕМА", "закончи стендап"'
-        return
 
     def handle_dialog(self, req: Request):
         if not req.is_authorized():  # Не умеем работать с неавторизованными пользователями
@@ -224,10 +226,12 @@ class DialogHandler:
         with self.connection_factory.create_conn() as connection:
             self.connection = connection
             if not self.connection.check_user_exists(req.user_id()):  # Новый пользователь
-                return self.new_user(req.user_id())
+                self.new_user(req.user_id())
+                return
 
             if req.is_session_new():
-                return self.returning_greeting(req.user_id())
+                self.returning_greeting(req.user_id())
+                return
 
             if req.command().startswith('запомни гитхаб'):
                 # Original utterance здесь, так как нам нужно именно то,
@@ -239,30 +243,37 @@ class DialogHandler:
                 self.list_issues(req.user_id())
                 return
 
-            if ci := self.close_issue_re.match(req.command()):
-                return self.close_issue(req.user_id(), int(ci.group(2)))
+            if close_issue_command := self.close_issue_re.match(req.command()):
+                self.close_issue(req.user_id(), int(close_issue_command.group(2)))
+                return
 
             if self.connection.check_standup(req.user_id()):  # user_id в текущий момент проводит стендап
-                return self.standup_mode(req)
+                self.standup_mode(req)
+                return
 
             if req.command() == 'помощь':
                 self.response['text'] = self.help_message()
                 return
 
             if req.command().startswith('добавь в команду человека с именем'):
-                return self.add_team_member_no_intent(req)
+                self.add_team_member_no_intent(req)
+                return
 
             if req.command() == 'напомни команду':
-                return self.remind_team(req.user_id())
+                self.remind_team(req.user_id())
+                return
 
             if self.begin_standup_re.match(req.command()):
-                return self.start_standup(req.user_id())
+                self.start_standup(req.user_id())
+                return
 
             intents = req.intents()
             if 'team.newmember' in intents:
-                return self.add_team_member(req.user_id(), intents['team.newmember']['slots']['name']['value'])
+                self.add_team_member(req.user_id(), intents['team.newmember']['slots']['name']['value'])
+                return
 
             if 'team.delmember' in intents:
-                return self.del_team_member(req.user_id(), intents['team.delmember']['slots']['name']['value'])
+                self.del_team_member(req.user_id(), intents['team.delmember']['slots']['name']['value'])
+                return
 
             self.response['text'] = 'Неизвестная команда. Если нужна подсказка, то есть команда "помощь"'

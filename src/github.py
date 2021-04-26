@@ -1,9 +1,10 @@
 import datetime
-import jwt
-import os
 import logging
-import requests
+import os
 from typing import List
+
+import jwt
+import requests
 from cachetools import cached, Cache, TTLCache
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
@@ -63,5 +64,3 @@ def close_issue(user: str, repo: str, installation: str, issue_number: int):
     response.raise_for_status()
     data = response.json()
     logging.info('response from github: %r', data)
-    return
-
