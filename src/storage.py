@@ -15,6 +15,8 @@ class StorageConnection(psycopg2.extensions.connection):
     def reset_user(self, user_id: str):
         with self.cursor() as cur:
             cur.execute("""UPDATE users SET standup_held = FALSE, cur_speaker = 0 WHERE user_id=%s""", (user_id,))
+        with self.cursor() as cur:
+            cur.execute("""UPDATE persons SET last_theme = NULL WHERE standup_organizer = %s""", (user_id,))
 
     def check_standup(self, user_id: str) -> bool:
         with self.cursor() as cur:
@@ -82,6 +84,29 @@ class StorageConnection(psycopg2.extensions.connection):
         with self.cursor() as cur:
             cur.execute("""UPDATE users SET cur_speaker = cur_speaker + 1 WHERE user_id = %s""", (user_id,))
         return next_speaker
+
+    def set_theme_for_current_speaker(self, user_id: str, theme: str):
+        with self.cursor() as cur:
+            cur.execute("""SELECT cur_speaker FROM users where user_id = %s""", (user_id,))
+            speaker_num = cur.fetchone()[0]
+        speaker = self.get_team_member(user_id, speaker_num - 1)
+        with self.cursor() as cur:
+            if not speaker['last_name']:
+                cur.execute("""UPDATE persons SET last_theme = %s WHERE standup_organizer = %s AND first_name = %s AND last_name IS NULL""",
+                            (theme, user_id, speaker['first_name']))
+            else:
+                cur.execute("""UPDATE persons SET last_theme = %s WHERE standup_organizer = %s AND first_name = %s AND last_name = %s""",
+                            (theme, user_id, speaker['first_name'], speaker['last_name']))
+
+    def get_team_themes(self, user_id: str) -> List[Dict[str, str]]:
+        with self.cursor() as cur:
+            cur.execute("""SELECT first_name, last_name, last_theme FROM persons WHERE standup_organizer = %s""",
+                        (user_id,))
+            themes = cur.fetchall()
+            result = []
+            for theme in themes:
+                result.append({'first_name': theme[0], 'last_name': theme[1], 'theme': theme[2]})
+            return result
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         res = super().__exit__(exc_type, exc_val, exc_tb)

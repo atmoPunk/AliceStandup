@@ -8,5 +8,6 @@ CREATE TABLE PERSONS( -- участники команд
 	person_id SERIAL PRIMARY KEY,
 	first_name TEXT NOT NULL,
 	last_name TEXT,
-	standup_organizer TEXT REFERENCES USERS(user_id)
+	standup_organizer TEXT REFERENCES USERS(user_id),
+	last_theme TEXT
 );
