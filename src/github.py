@@ -4,8 +4,14 @@ import os
 import logging
 import requests
 from typing import List
-from cachetools import cached, TTLCache
+from cachetools import cached, Cache, TTLCache
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+
+@cached(Cache(maxsize=1))
+def github_app_key():
+    with open(os.getenv('GITHUB_APP_KEY'), 'rb') as keyfile:
+        return load_pem_private_key(keyfile.read(), password=None)
 
 
 @cached(TTLCache(maxsize=1, ttl=600))
@@ -13,12 +19,11 @@ def github_jwt() -> str:
     now = datetime.datetime.now(datetime.timezone.utc)
     delta_before = datetime.timedelta(0, 0, 0, 0, -1, 0, 0)  # 1 minute
     delta_after = datetime.timedelta(0, 0, 0, 0, 10, 0, 0)  # 10 minutes
-    with open(os.getenv('GITHUB_APP_KEY'), 'rb') as keyfile:
-        key = load_pem_private_key(keyfile.read(), password=None)
+    key = github_app_key()
     payload = {
         'exp': int((now + delta_after).timestamp()),
         'iat': int((now + delta_before).timestamp()),
-        'iss': 109929
+        'iss': os.getenv('GITHUB_APP_ID')
     }
     return jwt.encode(payload, key, algorithm='RS256')
 
