@@ -4,7 +4,8 @@ CREATE TABLE USERS( -- пользователи навыка
 	cur_speaker INTEGER NOT NULL,
 	github_login TEXT,
 	repo TEXT,
-	installation_id TEXT
+	installation_id TEXT,
+	silence_enabled BOOLEAN NOT NULL
 );
 
 CREATE TABLE PERSONS( -- участники команд

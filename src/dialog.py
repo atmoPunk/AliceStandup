@@ -21,6 +21,7 @@ class DialogHandler:
         self.connection_factory = connection_factory
         self.connection = None
         self.response: Dict[str, Any] = {'end_session': False}
+        self.silence_enabled = True
 
     def returning_greeting(self, user_id: str):
         greeting = random.choice(self.greetings)
@@ -35,10 +36,12 @@ class DialogHandler:
         team_names = ', '.join(names)
         self.response['text'] = 'Твоя команда: ' + team_names
 
-    @staticmethod
-    def tts() -> str:
-        # Звук тишины
-        return os.getenv('TTS_FILENAME')
+    def tts(self) -> str:
+        if self.silence_enabled:
+            # Звук тишины
+            return os.getenv('TTS_FILENAME') + ' ' + self.tts_end
+        else:
+            return ''
 
     @staticmethod
     def help_message() -> str:
@@ -75,7 +78,7 @@ class DialogHandler:
                 self.response['tts'] = text
             else:
                 self.response['tts'] += text
-            self.response['tts'] += f' {self.tts() or ""} {self.tts_end}'
+            self.response['tts'] += self.tts()
         except IndexError:
             self.end_standup(user_id)
 
@@ -193,7 +196,7 @@ class DialogHandler:
         theme = req.command()[13:]
         self.connection.set_theme_for_current_speaker(req.user_id(), theme)
         self.response['text'] = f'Запомнила тему "{theme}"'
-        self.response['tts'] = f'запомнила тему {theme} . {self.tts() or ""} {self.tts_end}'
+        self.response['tts'] = f'запомнила тему {theme} . {self.tts()}'
 
     def standup_mode(self, req: Request):
         if 'end.report' in req.intents():
@@ -204,7 +207,7 @@ class DialogHandler:
             self.end_standup(req.user_id())
         elif req.command() == 'продолжить':
             self.response['text'] = ' '  # Игнорируем не команды
-            self.response['tts'] = f'{self.tts() or ""} {self.tts_end}'
+            self.response['tts'] = self.tts()
         elif 'skip.person' in req.intents():
             self.response['text'] = 'Хорошо, пропускаю.\n'
             self.response['tts'] = 'хорошо , пропускаю .'
@@ -224,9 +227,12 @@ class DialogHandler:
         # Этот context manager закоммитит транзакцию и вернет соединение в пул
         with self.connection_factory.create_conn() as connection:
             self.connection = connection
-            if not self.connection.check_user_exists(req.user_id()):  # Новый пользователь
+            req.user = self.connection.get_user(req.user_id())
+            if not req.user:  # Новый пользователь
                 self.new_user(req.user_id())
                 return
+
+            self.silence_enabled = req.user.silence_enabled
 
             if req.is_session_new():
                 self.returning_greeting(req.user_id())
@@ -264,6 +270,15 @@ class DialogHandler:
 
             if self.begin_standup_re.match(req.command()):
                 self.start_standup(req.user_id())
+                return
+
+            if req.command() == 'включи тишину':
+                self.connection.modify_silence(req.user_id(), True)
+                self.response['text'] = 'Тишина включена'
+                return
+            elif req.command() == 'выключи тишину':
+                self.connection.modify_silence(req.user_id(), False)
+                self.response['text'] = 'Тишина выключена'
                 return
 
             intents = req.intents()
