@@ -14,7 +14,6 @@ class DialogHandler:
     tts_end = 'если вы закончили , скажите " у меня всё " , иначе скажите " продолжить " '
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
     end_standup_re = re.compile('за(кончи|верши)(ть)? (стендап|стенд ап|standup|stand up)')
-    skip_person_re = re.compile('(пропус(ти|каем)( е(го|е|ё))?|е(го|ё|е) ((сегодня|сейчас) )?(нет|не будет))')
     greetings = ['Привет', 'Добрый день', 'Здравствуйте']
     close_issue_re = re.compile('закрой (issue|тикет) ([0-9]+)')
 
@@ -197,7 +196,7 @@ class DialogHandler:
         self.response['tts'] = f'запомнила тему {theme} . {self.tts() or ""} {self.tts_end}'
 
     def standup_mode(self, req: Request):
-        if req.command() == 'у меня все' or req.command() == 'у меня всё':
+        if 'end.report' in req.intents():
             self.call_next(req.user_id())
         elif req.command().startswith('запомни тему '):
             self.add_theme(req)
