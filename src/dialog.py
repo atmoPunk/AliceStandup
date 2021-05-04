@@ -14,7 +14,7 @@ class DialogHandler:
     tts_end = 'если вы закончили , скажите " у меня всё " , иначе скажите " продолжить " '
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
     end_standup_re = re.compile('за(кончи|верши)(ть)? (стендап|стенд ап|standup|stand up)')
-    skip_person_re = re.compile('е(го|ё) (сегодня|сейчас)? (нет|не будет)')
+    skip_person_re = re.compile('(пропус(ти|каем)( е(го|е|ё))?|е(го|ё|е) ((сегодня|сейчас) )?(нет|не будет))')
     greetings = ['Привет', 'Добрый день', 'Здравствуйте']
     close_issue_re = re.compile('закрой (issue|тикет) ([0-9]+)')
 
@@ -206,7 +206,7 @@ class DialogHandler:
         elif req.command() == 'продолжить':
             self.response['text'] = ' '  # Игнорируем не команды
             self.response['tts'] = f'{self.tts() or ""} {self.tts_end}'
-        elif self.skip_person_re.match(req.command()):
+        elif 'skip.person' in req.intents():
             self.response['text'] = 'Хорошо, пропускаю.\n'
             self.response['tts'] = 'хорошо , пропускаю .'
             self.call_next(req.user_id())
