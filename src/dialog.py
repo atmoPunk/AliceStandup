@@ -6,8 +6,9 @@ from typing import Dict, Any
 
 from requests import HTTPError
 
-from github import list_issues, close_issue
+from github import GithubTracker
 from request import Request
+from tracker import YandexTracker
 
 
 class AuthorizationRequest(Exception):
@@ -150,19 +151,30 @@ class DialogHandler:
                                 ' Это сделать можно воспользовавшись командой ' \
                                 '"Запомни гитхаб ЛОГИН РЕПО INSTALLATION_ID"'
 
-    def list_issues(self, user_id: str):
-        username, repo, installation = self.connection.get_github_info(user_id)
-        if username is None or repo is None or installation is None:
-            self.github_auth_help()
-            return
+    def list_issues(self, req: Request, tracker: str):
+        client = None
+        if tracker == 'github':
+            username, repo, installation = self.connection.get_github_info(req.user_id())
+            if username is None or repo is None or installation is None:
+                self.github_auth_help()
+                return
+            try:
+                client = GithubTracker(username, repo, installation)
+            except HTTPError as err:
+                logging.info(err)
+                self.response['text'] = f'Возникла ошибка в авторизации на гитхабе. Возможно это связано с неправильными ' \
+                                        f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
+                                        f' {repo}, Installation_id: {installation}.'
+
+        else:  # tracker == 'tracker'
+            # org, queue = self.connection.get_tracker_info(req.user_id())
+            client = YandexTracker(req._req['session']['user']['access_token'], ORG_ID)
         try:
-            issues = list_issues(username, repo, installation)
+            issues = client.list_issues()
             self.response['text'] = ', '.join(issues)
         except HTTPError as err:
             logging.info(err)
-            self.response['text'] = f'Возникла ошибка в получении тикетов. Возможно это связано с неправильными ' \
-                                    f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
-                                    f' {repo}, Installation_id: {installation}.'
+            self.response['text'] = f'Возникла ошибка в получении тикетов.'
 
     def register_github(self, user_id: str, command: str):
         splits = command.split(' ')
@@ -188,7 +200,8 @@ class DialogHandler:
             self.github_auth_help()
             return
         try:
-            close_issue(username, repo, installation, issue_number)
+            gh = GithubTracker(username, repo, installation)
+            gh.close_issue(issue_number)
             self.response['text'] = 'Тикет успешно закрыт'
         except HTTPError as err:
             logging.info(err)
@@ -259,8 +272,12 @@ class DialogHandler:
                 else:
                     raise AuthorizationRequest()
 
-            if req.command() == 'покажи тикеты':
-                self.list_issues(req.user_id())
+            if req.command() == 'покажи тикеты гитхаб':
+                self.list_issues(req.user_id(), 'github')
+                return
+
+            if req.command() == 'покажи тикеты трекер':
+                self.list_issues(req.user_id(), 'tracker')
                 return
 
             if close_issue_command := self.close_issue_re.match(req.command()):

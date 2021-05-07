@@ -7,3 +7,4 @@ requests
 python-dotenv
 cryptography
 cachetools
+yandex_tracker_client

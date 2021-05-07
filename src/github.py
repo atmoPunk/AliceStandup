@@ -1,12 +1,40 @@
 import datetime
 import logging
 import os
-from typing import List
 
 import jwt
 import requests
 from cachetools import cached, Cache, TTLCache
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+from issue_tracker import IssueTracker
+
+
+class GithubTracker(IssueTracker):
+    def __init__(self, username, repo, installation):
+        self.token = get_installation_token(installation)
+        self.user = username
+        self.repo = repo
+
+    def list_issues(self):
+        headers = {'Authorization': f'token {self.token}', 'Accept': 'application/vnd.github.v3+json'}
+        response = requests.get(f'https://api.github.com/repos/{self.user}/{self.repo}/issues', headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        logging.info('response from github: %r', data)
+        titles = [f"{r['number']}. {r['title']}" for r in data if 'pull_request' not in r]
+        titles = titles[:10]
+        return titles
+
+    def close_issue(self, issue):
+        headers = {'Authorization': f'token {self.token}', 'Accept': 'application/vnd.github.v3+json'}
+        params = {'state': 'closed'}
+        response = requests.patch(f'https://api.github.com/repos/{self.user}/{self.repo}/issues/{issue}',
+                                  headers=headers,
+                                  json=params)
+        response.raise_for_status()
+        data = response.json()
+        logging.info('response from github: %r', data)
 
 
 @cached(Cache(maxsize=1))
@@ -16,7 +44,7 @@ def github_app_key():
 
 
 @cached(TTLCache(maxsize=1, ttl=600))
-def github_jwt() -> str:
+def github_jwt() -> bytes:
     now = datetime.datetime.now(datetime.timezone.utc)
     delta_before = datetime.timedelta(0, 0, 0, 0, -1, 0, 0)  # 1 minute
     delta_after = datetime.timedelta(0, 0, 0, 0, 10, 0, 0)  # 10 minutes
@@ -40,27 +68,3 @@ def get_installation_token(installation) -> str:
     data = response.json()
     logging.info('response from github: %r', data)
     return data['token']
-
-
-def list_issues(user: str, repo: str, installation: str) -> List[str]:
-    token = get_installation_token(installation)
-    headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
-    response = requests.get(f'https://api.github.com/repos/{user}/{repo}/issues', headers=headers)
-    response.raise_for_status()
-    data = response.json()
-    logging.info('response from github: %r', data)
-    titles = [f"{r['number']}. {r['title']}" for r in data if 'pull_request' not in r]
-    titles = titles[:10]
-    return titles
-
-
-def close_issue(user: str, repo: str, installation: str, issue_number: int):
-    token = get_installation_token(installation)
-    headers = {'Authorization': f'token {token}', 'Accept': 'application/vnd.github.v3+json'}
-    params = {'state': 'closed'}
-    response = requests.patch(f'https://api.github.com/repos/{user}/{repo}/issues/{issue_number}',
-                              headers=headers,
-                              json=params)
-    response.raise_for_status()
-    data = response.json()
-    logging.info('response from github: %r', data)
