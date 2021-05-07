@@ -1,0 +1,27 @@
+root:
+    %lemma
+    $who ($when)? $absent
+    $skip ($who)?
+
+$who:
+    %lemma
+    он
+    она
+    $YANDEX.FIO
+
+$when:
+    %lemma
+    сегодня
+    сейчас
+    в этот раз
+
+$absent:
+    нет
+    отсутствует
+    в отпуске
+    болеет
+
+$skip:
+    %lemma
+    пропусти
+    пропускаем
