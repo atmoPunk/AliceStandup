@@ -10,6 +10,10 @@ from github import list_issues, close_issue
 from request import Request
 
 
+class AuthorizationRequest(Exception):
+    pass
+
+
 class DialogHandler:
     tts_end = 'если вы закончили , скажите " у меня всё " , иначе скажите " продолжить " '
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
@@ -234,6 +238,10 @@ class DialogHandler:
 
             self.silence_enabled = req.user.silence_enabled
 
+            if 'account_linking_complete_event' in req._req:
+                self.response['text'] = 'Вы успешно авторизованны'
+                return
+
             if req.is_session_new():
                 self.returning_greeting(req.user_id())
                 return
@@ -243,6 +251,13 @@ class DialogHandler:
                 # что передали
                 self.register_github(req.user_id(), req.original_utterance())
                 return
+
+            if req.command() == 'авторизуй трекер':
+                if 'access_token' in req._req['session']['user']:
+                    self.response['text'] = 'Вы уже авторизованны'
+                    return
+                else:
+                    raise AuthorizationRequest()
 
             if req.command() == 'покажи тикеты':
                 self.list_issues(req.user_id())

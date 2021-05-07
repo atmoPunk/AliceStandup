@@ -5,7 +5,7 @@ import ssl
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 
-from dialog import DialogHandler
+from dialog import DialogHandler, AuthorizationRequest
 from request import Request
 from storage import StorageConnectionFactory
 
@@ -17,10 +17,13 @@ logging.basicConfig(level=logging.DEBUG)
 def webhook():
     logging.info('Request: %r', request.json)
     handler = DialogHandler(StorageConnectionFactory())
-    handler.handle_dialog(Request(request.json))
     response = {'version': request.json['version'],
-                'session': request.json['session'],
-                'response': handler.response}
+                'session': request.json['session']}
+    try:
+        handler.handle_dialog(Request(request.json))
+        response['response'] = handler.response
+    except AuthorizationRequest:
+        response['start_account_linking'] = {}
     logging.info('Response: %r', response)
     return jsonify(response)
 
