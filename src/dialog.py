@@ -20,7 +20,7 @@ class DialogHandler:
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
     end_standup_re = re.compile('за(кончи|верши)(ть)? (стендап|стенд ап|standup|stand up)')
     greetings = ['Привет', 'Добрый день', 'Здравствуйте']
-    close_issue_re = re.compile('закрой (issue|тикет) ([0-9]+)')
+    close_issue_re = re.compile('закрой (issue|тикет) ([0-9]+) (github|tracker)')
 
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
@@ -168,7 +168,7 @@ class DialogHandler:
 
         else:  # tracker == 'tracker'
             # org, queue = self.connection.get_tracker_info(req.user_id())
-            client = YandexTracker(req._req['session']['user']['access_token'], ORG_ID)
+            client = YandexTracker(req._req['session']['user']['access_token'], 'ORG_ID', 'ALICESUTEST')
         try:
             issues = client.list_issues()
             self.response['text'] = ', '.join(issues)
@@ -194,20 +194,29 @@ class DialogHandler:
         self.connection.start_standup(user_id)
         self.call_next(user_id)
 
-    def close_issue(self, user_id: str, issue_number: int):
-        username, repo, installation = self.connection.get_github_info(user_id)
-        if username is None or repo is None or installation is None:
-            self.github_auth_help()
-            return
+    def close_issue(self, req: Request, issue_number: int, tracker: str):
+        client = None
+        if tracker == 'github':
+            username, repo, installation = self.connection.get_github_info(req.user_id())
+            if username is None or repo is None or installation is None:
+                self.github_auth_help()
+                return
+            try:
+                client = GithubTracker(username, repo, installation)
+            except HTTPError as err:
+                logging.info(err)
+                self.response['text'] = f'Возникла ошибка в авторизации на гитхабе. Возможно это связано с неправильными ' \
+                                        f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
+                                        f' {repo}, Installation_id: {installation}, номер тикета: {issue_number}.'
+        else:
+            # org_id, queue = self.connection.get_tracker_info(user_id)
+            client = YandexTracker(req._req['session']['user']['access_token'], 'ORG_ID', 'ALICESUTEST')
         try:
-            gh = GithubTracker(username, repo, installation)
-            gh.close_issue(issue_number)
+            client.close_issue(issue_number)
             self.response['text'] = 'Тикет успешно закрыт'
         except HTTPError as err:
             logging.info(err)
-            self.response['text'] = f'Возникла ошибка в закрытии тикета. Возможно это связано с неправильными ' \
-                                    f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
-                                    f' {repo}, Installation_id: {installation}, номер тикета: {issue_number}.'
+            self.response['text'] = 'Не удалось закрыть тикет'
 
     def add_theme(self, req: Request):
         theme = req.command()[13:]
@@ -273,15 +282,15 @@ class DialogHandler:
                     raise AuthorizationRequest()
 
             if req.command() == 'покажи тикеты гитхаб':
-                self.list_issues(req.user_id(), 'github')
+                self.list_issues(req, 'github')
                 return
 
             if req.command() == 'покажи тикеты трекер':
-                self.list_issues(req.user_id(), 'tracker')
+                self.list_issues(req, 'tracker')
                 return
 
             if close_issue_command := self.close_issue_re.match(req.command()):
-                self.close_issue(req.user_id(), int(close_issue_command.group(2)))
+                self.close_issue(req, int(close_issue_command.group(2)), close_issue_command.group(3))
                 return
 
             if self.connection.check_standup(req.user_id()):  # user_id в текущий момент проводит стендап
