@@ -123,10 +123,21 @@ class StorageConnection(psycopg2.extensions.connection):
             data = cur.fetchone()
             return data
 
+    def get_tracker_info(self, user_id: str):
+        with self.cursor() as cur:
+            cur.execute("""SELECT tracker_org, tracker_queue FROM users WHERE user_id=%s""", (user_id,))
+            data = cur.fetchone()
+            return data
+
     def register_github(self, user_id: str, name: str, repo: str, installation_id: str):
         with self.cursor() as cur:
             cur.execute("""UPDATE users SET github_login=%s, repo=%s, installation_id=%s WHERE user_id=%s""",
                         (name, repo, installation_id, user_id))
+
+    def register_tracker(self, user_id: str, org: str, queue: str):
+        with self.cursor() as cur:
+            cur.execute("""UPDATE users SET tracker_org=%s, tracker_queue=%s WHERE user_id=%s""",
+                        (org, queue, user_id))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         res = super().__exit__(exc_type, exc_val, exc_tb)

@@ -5,6 +5,8 @@ CREATE TABLE USERS( -- пользователи навыка
 	github_login TEXT,
 	repo TEXT,
 	installation_id TEXT,
+	tracker_org TEXT,
+	tracker_queue TEXT,
 	silence_enabled BOOLEAN NOT NULL
 );
 

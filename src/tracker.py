@@ -4,6 +4,14 @@ from cachetools import TTLCache, cached
 from issue_tracker import IssueTracker
 
 
+class NoTokenException(Exception):
+    pass
+
+
+class NoInfoException(Exception):
+    pass
+
+
 class YandexTracker(IssueTracker):
     def __init__(self, token, org_id, queue):
         self.client = get_ytc(token, org_id)

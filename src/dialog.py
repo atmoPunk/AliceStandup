@@ -8,7 +8,7 @@ from requests import HTTPError
 
 from github import GithubTracker
 from request import Request
-from tracker import YandexTracker
+from tracker import YandexTracker, NoTokenException, NoInfoException
 
 
 class AuthorizationRequest(Exception):
@@ -151,6 +151,25 @@ class DialogHandler:
                                 ' Это сделать можно воспользовавшись командой ' \
                                 '"Запомни гитхаб ЛОГИН РЕПО INSTALLATION_ID"'
 
+    def tracker_auth_help(self):
+        self.response['text'] = 'Чтобы авторизоваться в трекере необходимо использовать команду \'авторизуй трекер\'.' \
+                                ' Затем при помощи команды \'запомни трекер ORG_ID QUEUE\' надо указать идентификатор ' \
+                                'организации и очередь, с которой вы хотите работать'
+
+    def tracker_reg_help(self):
+        self.response['text'] = 'При помощи команды \'запомни трекер ORG_ID QUEUE\' надо указать идентификатор ' \
+                                'организации и очередь, с которой вы хотите работать'
+
+    def get_tracker_client(self, req: Request):
+        org, queue = self.connection.get_tracker_info(req.user_id())
+        if 'access_token' not in req._req['session']['user']:
+            self.tracker_auth_help()
+            raise NoTokenException()
+        if org is None or queue is None:
+            self.tracker_reg_help()
+            raise NoInfoException()
+        return YandexTracker(req._req['session']['user']['access_token'], org, queue)
+
     def list_issues(self, req: Request, tracker: str):
         client = None
         if tracker == 'github':
@@ -167,8 +186,11 @@ class DialogHandler:
                                         f' {repo}, Installation_id: {installation}.'
 
         else:  # tracker == 'tracker'
-            # org, queue = self.connection.get_tracker_info(req.user_id())
-            client = YandexTracker(req._req['session']['user']['access_token'], 'ORG_ID', 'ALICESUTEST')
+            try:
+                client = self.get_tracker_client(req)
+            except (NoTokenException, NoInfoException):
+                # message is already written
+                return
         try:
             issues = client.list_issues()
             self.response['text'] = ', '.join(issues)
@@ -186,6 +208,17 @@ class DialogHandler:
         in_id = splits[4]
         self.connection.register_github(user_id, name, repo, in_id)
         self.response['text'] = f'Успешно запомнила: логин "{name}", репозиторий "{repo}" и installation id "{in_id}"'
+        self.response['tts'] = 'Успешно запомнила'
+
+    def register_tracker(self, user_id: str, command: str):
+        splits = command.split(' ')
+        if len(splits) > 4:
+            self.response['text'] = 'Неправильный формат. Ожидается "запомни трекер ORG_ID QUEUE"'
+            return
+        org = splits[2]
+        queue = splits[3]
+        self.connection.register_tracker(user_id, org, queue)
+        self.response['text'] = f'Успешно запомнила: организация "{org}", очередь "{queue}"'
         self.response['tts'] = 'Успешно запомнила'
 
     def start_standup(self, user_id: str):
@@ -209,8 +242,11 @@ class DialogHandler:
                                         f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
                                         f' {repo}, Installation_id: {installation}, номер тикета: {issue_number}.'
         else:
-            # org_id, queue = self.connection.get_tracker_info(user_id)
-            client = YandexTracker(req._req['session']['user']['access_token'], 'ORG_ID', 'ALICESUTEST')
+            try:
+                client = self.get_tracker_client(req)
+            except (NoTokenException, NoInfoException):
+                # message is already written
+                return
         try:
             client.close_issue(issue_number)
             self.response['text'] = 'Тикет успешно закрыт'
@@ -272,6 +308,10 @@ class DialogHandler:
                 # Original utterance здесь, так как нам нужно именно то,
                 # что передали
                 self.register_github(req.user_id(), req.original_utterance())
+                return
+
+            if req.command().startswith('запомни трекер'):
+                self.register_tracker(req.user_id(), req.original_utterance())
                 return
 
             if req.command() == 'авторизуй трекер':
