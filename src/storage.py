@@ -139,6 +139,10 @@ class StorageConnection(psycopg2.extensions.connection):
             cur.execute("""UPDATE users SET tracker_org=%s, tracker_queue=%s WHERE user_id=%s""",
                         (org, queue, user_id))
 
+    def clean_team(self, user_id: str):
+        with self.cursor() as cur:
+            cur.execute("""DELETE FROM persons WHERE standup_organizer = %s""", (user_id,))
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         res = super().__exit__(exc_type, exc_val, exc_tb)
         pool().putconn(self)

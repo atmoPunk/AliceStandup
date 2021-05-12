@@ -146,6 +146,10 @@ class DialogHandler:
         else:
             self.response['text'] = f'Не смогла удалить {last_name.capitalize()} {first_name.capitalize()}'
 
+    def clean_team(self, user_id: str):
+        self.connection.clean_team(user_id)
+        self.response['text'] = 'Все люди из команды были удалены'
+
     def github_auth_help(self):
         self.response['text'] = 'Пожалуйста предоставьте свой логин, название репозитория и installation id.' \
                                 ' Это сделать можно воспользовавшись командой ' \
@@ -360,6 +364,10 @@ class DialogHandler:
             elif req.command() == 'выключи тишину':
                 self.connection.modify_silence(req.user_id(), False)
                 self.response['text'] = 'Тишина выключена'
+                return
+
+            if req.command() == 'удали команду':
+                self.clean_team(req.user_id())
                 return
 
             intents = req.intents()
