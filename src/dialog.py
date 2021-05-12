@@ -2,21 +2,31 @@ import logging
 import os
 import random
 import re
-from request import Request
 from typing import Dict, Any
+
+from requests import HTTPError
+
+from github import GithubTracker
+from request import Request
+from tracker import YandexTracker, NoTokenException, NoInfoException
+
+
+class AuthorizationRequest(Exception):
+    pass
 
 
 class DialogHandler:
     tts_end = 'если вы закончили , скажите " у меня всё " , иначе скажите " продолжить " '
     begin_standup_re = re.compile('(начать|начни|проведи) (стендап|стенд ап|standup|stand up)')
     end_standup_re = re.compile('за(кончи|верши)(ть)? (стендап|стенд ап|standup|stand up)')
-    skip_person_re = re.compile('е(го|ё) (сегодня|сейчас)? (нет|не будет)')
     greetings = ['Привет', 'Добрый день', 'Здравствуйте']
+    close_issue_re = re.compile('закрой (issue|тикет) ([0-9]+) (github|tracker)')
 
     def __init__(self, connection_factory):
         self.connection_factory = connection_factory
         self.connection = None
         self.response: Dict[str, Any] = {'end_session': False}
+        self.silence_enabled = True
 
     def returning_greeting(self, user_id: str):
         greeting = random.choice(self.greetings)
@@ -31,10 +41,12 @@ class DialogHandler:
         team_names = ', '.join(names)
         self.response['text'] = 'Твоя команда: ' + team_names
 
-    @staticmethod
-    def tts() -> str:
-        # Звук тишины
-        return os.getenv('TTS_FILENAME')
+    def tts(self) -> str:
+        if self.silence_enabled:
+            # Звук тишины
+            return os.getenv('TTS_FILENAME') + ' ' + self.tts_end
+        else:
+            return ''
 
     @staticmethod
     def help_message() -> str:
@@ -71,7 +83,7 @@ class DialogHandler:
                 self.response['tts'] = text
             else:
                 self.response['tts'] += text
-            self.response['tts'] += f' {self.tts() or ""} {self.tts_end}'
+            self.response['tts'] += self.tts()
         except IndexError:
             self.end_standup(user_id)
 
@@ -134,20 +146,126 @@ class DialogHandler:
         else:
             self.response['text'] = f'Не смогла удалить {last_name.capitalize()} {first_name.capitalize()}'
 
+    def clean_team(self, user_id: str):
+        self.connection.clean_team(user_id)
+        self.response['text'] = 'Все люди из команды были удалены'
+
+    def github_auth_help(self):
+        self.response['text'] = 'Пожалуйста предоставьте свой логин, название репозитория и installation id.' \
+                                ' Это сделать можно воспользовавшись командой ' \
+                                '"Запомни гитхаб ЛОГИН РЕПО INSTALLATION_ID"'
+
+    def tracker_auth_help(self):
+        self.response['text'] = 'Чтобы авторизоваться в трекере необходимо использовать команду \'авторизуй трекер\'.' \
+                                ' Затем при помощи команды \'запомни трекер ORG_ID QUEUE\' надо указать идентификатор ' \
+                                'организации и очередь, с которой вы хотите работать'
+
+    def tracker_reg_help(self):
+        self.response['text'] = 'При помощи команды \'запомни трекер ORG_ID QUEUE\' надо указать идентификатор ' \
+                                'организации и очередь, с которой вы хотите работать'
+
+    def get_tracker_client(self, req: Request):
+        org, queue = self.connection.get_tracker_info(req.user_id())
+        if 'access_token' not in req._req['session']['user']:
+            self.tracker_auth_help()
+            raise NoTokenException()
+        if org is None or queue is None:
+            self.tracker_reg_help()
+            raise NoInfoException()
+        return YandexTracker(req._req['session']['user']['access_token'], org, queue)
+
+    def list_issues(self, req: Request, tracker: str):
+        client = None
+        if tracker == 'github':
+            username, repo, installation = self.connection.get_github_info(req.user_id())
+            if username is None or repo is None or installation is None:
+                self.github_auth_help()
+                return
+            try:
+                client = GithubTracker(username, repo, installation)
+            except HTTPError as err:
+                logging.info(err)
+                self.response['text'] = f'Возникла ошибка в авторизации на гитхабе. Возможно это связано с неправильными ' \
+                                        f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
+                                        f' {repo}, Installation_id: {installation}.'
+
+        else:  # tracker == 'tracker'
+            try:
+                client = self.get_tracker_client(req)
+            except (NoTokenException, NoInfoException):
+                # message is already written
+                return
+        try:
+            issues = client.list_issues()
+            self.response['text'] = ', '.join(issues)
+        except HTTPError as err:
+            logging.info(err)
+            self.response['text'] = f'Возникла ошибка в получении тикетов.'
+
+    def register_github(self, user_id: str, command: str):
+        splits = command.split(' ')
+        if len(splits) > 5:
+            self.response['text'] = 'Неправильный формат'
+            return
+        name = splits[2]
+        repo = splits[3]
+        in_id = splits[4]
+        self.connection.register_github(user_id, name, repo, in_id)
+        self.response['text'] = f'Успешно запомнила: логин "{name}", репозиторий "{repo}" и installation id "{in_id}"'
+        self.response['tts'] = 'Успешно запомнила'
+
+    def register_tracker(self, user_id: str, command: str):
+        splits = command.split(' ')
+        if len(splits) > 4:
+            self.response['text'] = 'Неправильный формат. Ожидается "запомни трекер ORG_ID QUEUE"'
+            return
+        org = splits[2]
+        queue = splits[3]
+        self.connection.register_tracker(user_id, org, queue)
+        self.response['text'] = f'Успешно запомнила: организация "{org}", очередь "{queue}"'
+        self.response['tts'] = 'Успешно запомнила'
+
     def start_standup(self, user_id: str):
         self.response['text'] = 'Хорошо, начинаю.\n'
         self.response['tts'] = 'хорошо , начинаю .'
         self.connection.start_standup(user_id)
         self.call_next(user_id)
 
+    def close_issue(self, req: Request, issue_number: int, tracker: str):
+        client = None
+        if tracker == 'github':
+            username, repo, installation = self.connection.get_github_info(req.user_id())
+            if username is None or repo is None or installation is None:
+                self.github_auth_help()
+                return
+            try:
+                client = GithubTracker(username, repo, installation)
+            except HTTPError as err:
+                logging.info(err)
+                self.response['text'] = f'Возникла ошибка в авторизации на гитхабе. Возможно это связано с неправильными ' \
+                                        f'данными. Проверьте данные и попробуйте ещё раз. Логин: {username}, репозиторий:' \
+                                        f' {repo}, Installation_id: {installation}, номер тикета: {issue_number}.'
+        else:
+            try:
+                client = self.get_tracker_client(req)
+            except (NoTokenException, NoInfoException):
+                # message is already written
+                return
+        try:
+            client.close_issue(issue_number)
+            self.response['text'] = 'Тикет успешно закрыт'
+        except HTTPError as err:
+            logging.info(err)
+            self.response['text'] = 'Не удалось закрыть тикет'
+
     def add_theme(self, req: Request):
         theme = req.command()[13:]
         self.connection.set_theme_for_current_speaker(req.user_id(), theme)
         self.response['text'] = f'Запомнила тему "{theme}"'
-        self.response['tts'] = f'запомнила тему {theme} . {self.tts() or ""} {self.tts_end}'
+        self.response['tts'] = f'запомнила тему {theme} . {self.tts()}'
 
     def standup_mode(self, req: Request):
-        if req.command() == 'у меня все' or req.command() == 'у меня всё':
+        if 'end.report' in req.intents():
             self.call_next(req.user_id())
         elif req.command().startswith('запомни тему '):
             self.add_theme(req)
@@ -155,8 +273,8 @@ class DialogHandler:
             self.end_standup(req.user_id())
         elif req.command() == 'продолжить':
             self.response['text'] = ' '  # Игнорируем не команды
-            self.response['tts'] = f'{self.tts() or ""} {self.tts_end}'
-        elif self.skip_person_re.match(req.command()):
+            self.response['tts'] = self.tts()
+        elif 'skip.person' in req.intents():
             self.response['text'] = 'Хорошо, пропускаю.\n'
             self.response['tts'] = 'хорошо , пропускаю .'
             self.call_next(req.user_id())
@@ -164,7 +282,6 @@ class DialogHandler:
             self.response['text'] = 'Не смогла распознать команду. Во время проведения стендапа могу ' \
                                     'распознать следующие команды: "у меня всё", "продолжить", ' \
                                     '"его|её сегодня нет", "запомнить тему ТЕМА", "закончи стендап"'
-        return
 
     def handle_dialog(self, req: Request):
         if not req.is_authorized():  # Не умеем работать с неавторизованными пользователями
@@ -176,33 +293,90 @@ class DialogHandler:
         # Этот context manager закоммитит транзакцию и вернет соединение в пул
         with self.connection_factory.create_conn() as connection:
             self.connection = connection
-            if not self.connection.check_user_exists(req.user_id()):  # Новый пользователь
-                return self.new_user(req.user_id())
+            req.user = self.connection.get_user(req.user_id())
+            if not req.user:  # Новый пользователь
+                self.new_user(req.user_id())
+                return
+
+            self.silence_enabled = req.user.silence_enabled
+
+            if 'account_linking_complete_event' in req._req:
+                self.response['text'] = 'Вы успешно авторизованны'
+                return
 
             if req.is_session_new():
-                return self.returning_greeting(req.user_id())
+                self.returning_greeting(req.user_id())
+                return
+
+            if req.command().startswith('запомни гитхаб'):
+                # Original utterance здесь, так как нам нужно именно то,
+                # что передали
+                self.register_github(req.user_id(), req.original_utterance())
+                return
+
+            if req.command().startswith('запомни трекер'):
+                self.register_tracker(req.user_id(), req.original_utterance())
+                return
+
+            if req.command() == 'авторизуй трекер':
+                if 'access_token' in req._req['session']['user']:
+                    self.response['text'] = 'Вы уже авторизованны'
+                    return
+                else:
+                    raise AuthorizationRequest()
+
+            if req.command() == 'покажи тикеты гитхаб':
+                self.list_issues(req, 'github')
+                return
+
+            if req.command() == 'покажи тикеты трекер':
+                self.list_issues(req, 'tracker')
+                return
+
+            if close_issue_command := self.close_issue_re.match(req.command()):
+                self.close_issue(req, int(close_issue_command.group(2)), close_issue_command.group(3))
+                return
 
             if self.connection.check_standup(req.user_id()):  # user_id в текущий момент проводит стендап
-                return self.standup_mode(req)
+                self.standup_mode(req)
+                return
 
             if req.command() == 'помощь':
                 self.response['text'] = self.help_message()
                 return
 
             if req.command().startswith('добавь в команду человека с именем'):
-                return self.add_team_member_no_intent(req)
+                self.add_team_member_no_intent(req)
+                return
 
             if req.command() == 'напомни команду':
-                return self.remind_team(req.user_id())
+                self.remind_team(req.user_id())
+                return
 
             if self.begin_standup_re.match(req.command()):
-                return self.start_standup(req.user_id())
+                self.start_standup(req.user_id())
+                return
+
+            if req.command() == 'включи тишину':
+                self.connection.modify_silence(req.user_id(), True)
+                self.response['text'] = 'Тишина включена'
+                return
+            elif req.command() == 'выключи тишину':
+                self.connection.modify_silence(req.user_id(), False)
+                self.response['text'] = 'Тишина выключена'
+                return
+
+            if req.command() == 'удали команду':
+                self.clean_team(req.user_id())
+                return
 
             intents = req.intents()
             if 'team.newmember' in intents:
-                return self.add_team_member(req.user_id(), intents['team.newmember']['slots']['name']['value'])
+                self.add_team_member(req.user_id(), intents['team.newmember']['slots']['name']['value'])
+                return
 
             if 'team.delmember' in intents:
-                return self.del_team_member(req.user_id(), intents['team.delmember']['slots']['name']['value'])
+                self.del_team_member(req.user_id(), intents['team.delmember']['slots']['name']['value'])
+                return
 
             self.response['text'] = 'Неизвестная команда. Если нужна подсказка, то есть команда "помощь"'

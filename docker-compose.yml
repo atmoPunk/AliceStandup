@@ -13,9 +13,18 @@ services:
       - SSL_KEY
       - PYTHONUNBUFFERED=1
       - TTS_FILENAME
+      - INSTALLATION_ID
+      - GITHUB_APP_KEY
+      - GITHUB_APP_ID
     volumes:
       - ${SSL_CERT}:${SSL_CERT}
       - ${SSL_KEY}:${SSL_KEY}
+      - ${GITHUB_APP_KEY}:${GITHUB_APP_KEY}
+    logging:
+      driver: loki
+      options:
+        loki-url: "https://${LOKI_USER}:${LOKI_KEY}@logs-prod-us-central1.grafana.net/loki/api/v1/push"
+        loki-batch-size: "5"
   postgres:
     build: db/
     environment:

@@ -1,16 +1,22 @@
 import functools
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import psycopg2
 import psycopg2.extensions
 import psycopg2.pool
+
+from user import User
 
 
 class StorageConnection(psycopg2.extensions.connection):
     def start_standup(self, user_id: str):
         with self.cursor() as cur:
             cur.execute("""UPDATE users SET standup_held = TRUE WHERE user_id=%s""", (user_id,))
+
+    def modify_silence(self, user_id: str, value: bool):
+        with self.cursor() as cur:
+            cur.execute("""UPDATE users SET silence_enabled = %s WHERE user_id=%s""", (value, user_id))
 
     def reset_user(self, user_id: str):
         with self.cursor() as cur:
@@ -28,13 +34,16 @@ class StorageConnection(psycopg2.extensions.connection):
 
     def create_user(self, user_id: str):
         with self.cursor() as cur:
-            cur.execute("""INSERT INTO users(user_id, standup_held, cur_speaker) VALUES(%s, False, 0)""", (user_id,))
+            cur.execute("""INSERT INTO users(user_id, standup_held, cur_speaker, silence_enabled) VALUES(%s, False, 0, True)""", (user_id,))
 
-    def check_user_exists(self, user_id: str) -> bool:
+    def get_user(self, user_id: str) -> Optional[User]:
         with self.cursor() as cur:
-            cur.execute("""SELECT 1 FROM users where user_id = %s""", (user_id,))
+            cur.execute("""SELECT * FROM users where user_id = %s""", (user_id,))
             result = cur.fetchone()
-            return result is not None
+            if not result:
+                return None
+            else:
+                return User(*result)
 
     def add_team_member(self, user_id: str, person: Dict[str, str]):
         with self.cursor() as cur:
@@ -107,6 +116,32 @@ class StorageConnection(psycopg2.extensions.connection):
             for theme in themes:
                 result.append({'first_name': theme[0], 'last_name': theme[1], 'theme': theme[2]})
             return result
+
+    def get_github_info(self, user_id: str):
+        with self.cursor() as cur:
+            cur.execute("""SELECT github_login, repo, installation_id FROM users WHERE user_id=%s""", (user_id,))
+            data = cur.fetchone()
+            return data
+
+    def get_tracker_info(self, user_id: str):
+        with self.cursor() as cur:
+            cur.execute("""SELECT tracker_org, tracker_queue FROM users WHERE user_id=%s""", (user_id,))
+            data = cur.fetchone()
+            return data
+
+    def register_github(self, user_id: str, name: str, repo: str, installation_id: str):
+        with self.cursor() as cur:
+            cur.execute("""UPDATE users SET github_login=%s, repo=%s, installation_id=%s WHERE user_id=%s""",
+                        (name, repo, installation_id, user_id))
+
+    def register_tracker(self, user_id: str, org: str, queue: str):
+        with self.cursor() as cur:
+            cur.execute("""UPDATE users SET tracker_org=%s, tracker_queue=%s WHERE user_id=%s""",
+                        (org, queue, user_id))
+
+    def clean_team(self, user_id: str):
+        with self.cursor() as cur:
+            cur.execute("""DELETE FROM persons WHERE standup_organizer = %s""", (user_id,))
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         res = super().__exit__(exc_type, exc_val, exc_tb)
