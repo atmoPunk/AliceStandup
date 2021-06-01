@@ -1,0 +1,11 @@
+root:
+    $Remember $Theme_content
+
+$Remember:
+    %lemma
+    (запомни|запиши)
+
+$Theme_content:
+    %lemma
+    (тему)? .+
+

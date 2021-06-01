@@ -1,0 +1,12 @@
+entity TaskSource:
+    lemma: true
+    values:
+        github:
+
+            github
+            гитхаб
+        tracker:
+            трекер
+            яндекс трекер
+            tracker
+            Yandex tracker

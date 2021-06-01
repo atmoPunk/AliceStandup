@@ -1,0 +1,12 @@
+slots:
+    task_source:
+        type: TaskSource
+        source: $TASK_SOURCE
+
+root:
+    %lemma
+    покажи тикеты (с)? $TASK_SOURCE
+
+$TASK_SOURCE:
+    $TaskSource
+

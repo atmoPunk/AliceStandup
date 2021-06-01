@@ -1,0 +1,25 @@
+slots:
+    login:
+        source: $Login
+    repo:
+        source: $Repo
+    installation_id:
+        type: YANDEX.NUMBER
+        source: $InstallationId
+
+root:
+    %lemma
+    запомни $Github $Login $Repo $InstallationId
+
+$Repo:
+    .
+
+$Login:
+    .
+
+$InstallationId:
+    $YANDEX.NUMBER
+
+$Github:
+    github | гитхаб
+

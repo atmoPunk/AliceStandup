@@ -1,0 +1,20 @@
+slots:
+    queue:
+        source: $Queue
+    org_id:
+        type: YANDEX.NUMBER
+        source: $OrgId
+
+root:
+    %lemma
+    запомни $Tracker $OrgId $Queue
+
+$Queue:
+    .
+
+$OrgId:
+    $YANDEX.NUMBER
+
+$Tracker:
+    (яндекс|yandex)? (трекер|tracker)
+
